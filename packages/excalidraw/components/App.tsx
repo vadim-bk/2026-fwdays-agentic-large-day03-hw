@@ -258,6 +258,7 @@ import {
   maybeHandleArrowPointlikeDrag,
   getUncroppedWidthAndHeight,
   getActiveTextElement,
+  getInlineTextHyperlinkAtScenePoint,
 } from "@excalidraw/element";
 
 import type { GlobalPoint, LocalPoint, Radians } from "@excalidraw/math";
@@ -683,6 +684,14 @@ class App extends React.Component<AppProps, AppState> {
   bindModeHandler: ReturnType<typeof setTimeout> | null = null;
 
   hitLinkElement?: NonDeletedExcalidrawElement;
+  hitInlineTextHyperlink?: {
+    element: NonDeleted<ExcalidrawTextElement>;
+    url: string;
+  };
+  private inlineTextHyperlinkPointerDown: {
+    elementId: string;
+    url: string;
+  } | null = null;
   lastPointerDownEvent: React.PointerEvent<HTMLElement> | null = null;
   lastPointerUpEvent: React.PointerEvent<HTMLElement> | PointerEvent | null =
     null;
@@ -6600,6 +6609,72 @@ class App extends React.Component<AppProps, AppState> {
     }
   };
 
+  /**
+   * Inline `[label](url)` hits take precedence over the element-level link icon when
+   * both exist; text editing is unchanged (double-click still opens the wysiwyg).
+   */
+  private getInlineTextHyperlinkAtScene = (scenePointer: {
+    x: number;
+    y: number;
+  }):
+    | { element: NonDeleted<ExcalidrawTextElement>; url: string }
+    | undefined => {
+    const hits = this.getElementsAtPosition(scenePointer.x, scenePointer.y, {
+      includeBoundTextElement: true,
+      includeLockedElements: false,
+    });
+    const elementsMap = this.scene.getNonDeletedElementsMap();
+    const theme = this.state.theme === THEME.DARK ? THEME.DARK : THEME.LIGHT;
+    for (let i = hits.length - 1; i >= 0; i--) {
+      const element = hits[i];
+      if (!isTextElement(element)) {
+        continue;
+      }
+      const font = getFontString(element);
+      const url = getInlineTextHyperlinkAtScenePoint(
+        element,
+        elementsMap,
+        pointFrom(scenePointer.x, scenePointer.y),
+        font,
+        theme,
+      );
+      if (url) {
+        return { element, url };
+      }
+    }
+    return undefined;
+  };
+
+  private openHyperlinkFromUserGesture = (
+    url: string,
+    event: React.PointerEvent<HTMLCanvasElement>,
+    element: NonDeletedExcalidrawElement,
+  ) => {
+    const normalized = normalizeLink(url);
+    if (!normalized) {
+      return;
+    }
+    let customEvent;
+    if (this.props.onLinkOpen) {
+      customEvent = wrapEvent(EVENT.EXCALIDRAW_LINK, event.nativeEvent);
+      this.props.onLinkOpen(
+        {
+          ...element,
+          link: normalized,
+        },
+        customEvent,
+      );
+    }
+    if (!customEvent?.defaultPrevented) {
+      const target = isLocalLink(normalized) ? "_self" : "_blank";
+      const newWindow = window.open(undefined, target);
+      if (newWindow) {
+        newWindow.opener = null;
+        newWindow.location = normalized;
+      }
+    }
+  };
+
   private handleElementLinkClick = (
     event: React.PointerEvent<HTMLCanvasElement>,
   ) => {
@@ -6641,30 +6716,44 @@ class App extends React.Component<AppProps, AppState> {
     );
     if (lastPointerDownHittingLinkIcon && lastPointerUpHittingLinkIcon) {
       hideHyperlinkToolip();
-      let url = this.hitLinkElement.link;
-      if (url) {
-        url = normalizeLink(url);
-        let customEvent;
-        if (this.props.onLinkOpen) {
-          customEvent = wrapEvent(EVENT.EXCALIDRAW_LINK, event.nativeEvent);
-          this.props.onLinkOpen(
-            {
-              ...this.hitLinkElement,
-              link: url,
-            },
-            customEvent,
-          );
-        }
-        if (!customEvent?.defaultPrevented) {
-          const target = isLocalLink(url) ? "_self" : "_blank";
-          const newWindow = window.open(undefined, target);
-          // https://mathiasbynens.github.io/rel-noopener/
-          if (newWindow) {
-            newWindow.opener = null;
-            newWindow.location = url;
-          }
-        }
+      const link = this.hitLinkElement.link;
+      if (link) {
+        this.openHyperlinkFromUserGesture(link, event, this.hitLinkElement);
       }
+    }
+  };
+
+  private handleInlineTextHyperlinkClick = (
+    event: React.PointerEvent<HTMLCanvasElement>,
+  ) => {
+    if (!this.inlineTextHyperlinkPointerDown) {
+      return;
+    }
+    const draggedDistance = pointDistance(
+      pointFrom(
+        this.lastPointerDownEvent!.clientX,
+        this.lastPointerDownEvent!.clientY,
+      ),
+      pointFrom(
+        this.lastPointerUpEvent!.clientX,
+        this.lastPointerUpEvent!.clientY,
+      ),
+    );
+    if (draggedDistance > DRAGGING_THRESHOLD) {
+      return;
+    }
+    const lastPointerUpCoords = viewportCoordsToSceneCoords(
+      this.lastPointerUpEvent!,
+      this.state,
+    );
+    const upHit = this.getInlineTextHyperlinkAtScene(lastPointerUpCoords);
+    if (
+      upHit &&
+      upHit.url === this.inlineTextHyperlinkPointerDown.url &&
+      upHit.element.id === this.inlineTextHyperlinkPointerDown.elementId
+    ) {
+      hideHyperlinkToolip();
+      this.openHyperlinkFromUserGesture(upHit.url, event, upHit.element);
     }
   };
 
@@ -7204,13 +7293,25 @@ class App extends React.Component<AppProps, AppState> {
         moveEvent: event,
       })
     ) {
-      this.hitLinkElement = this.getElementLinkAtPosition(
-        scenePointer,
-        hitElementMightBeLocked,
-      );
+      this.hitInlineTextHyperlink =
+        this.getInlineTextHyperlinkAtScene(scenePointer);
+      this.hitLinkElement = this.hitInlineTextHyperlink
+        ? undefined
+        : this.getElementLinkAtPosition(
+            scenePointer,
+            hitElementMightBeLocked,
+          );
+    } else {
+      this.hitInlineTextHyperlink = undefined;
     }
 
     if (
+      this.hitInlineTextHyperlink &&
+      !this.state.selectedElementIds[this.hitInlineTextHyperlink.element.id]
+    ) {
+      setCursor(this.interactiveCanvas, CURSOR_TYPE.POINTER);
+      hideHyperlinkToolip();
+    } else if (
       this.hitLinkElement &&
       !this.state.selectedElementIds[this.hitLinkElement.id]
     ) {
@@ -7970,7 +8071,15 @@ class App extends React.Component<AppProps, AppState> {
       );
     }
 
+    const hadInlineTextHyperlinkPointerDown =
+      !!this.inlineTextHyperlinkPointerDown;
+    if (hadInlineTextHyperlinkPointerDown) {
+      this.handleInlineTextHyperlinkClick(event);
+    }
+    this.inlineTextHyperlinkPointerDown = null;
+
     if (
+      !hadInlineTextHyperlinkPointerDown &&
       this.hitLinkElement &&
       !this.state.selectedElementIds[this.hitLinkElement.id]
     ) {
@@ -8465,6 +8574,18 @@ class App extends React.Component<AppProps, AppState> {
               pointerDownState.origin.y,
             );
         }
+
+        const inlineHitAtDown = this.getInlineTextHyperlinkAtScene(
+          pointerDownState.origin,
+        );
+        if (inlineHitAtDown) {
+          this.inlineTextHyperlinkPointerDown = {
+            elementId: inlineHitAtDown.element.id,
+            url: inlineHitAtDown.url,
+          };
+          return true;
+        }
+        this.inlineTextHyperlinkPointerDown = null;
 
         this.hitLinkElement = this.getElementLinkAtPosition(
           pointerDownState.origin,

@@ -1,6 +1,15 @@
 import { isDevEnv, isTestEnv } from "@excalidraw/common";
 
-import { charWidth, getLineWidth } from "./textMeasurements";
+import {
+  charWidth,
+  getLineWidth,
+  measureTextLineWidth,
+} from "./textMeasurements";
+import {
+  lineContainsHyperlinkSyntax,
+  parseTextHyperlinkCandidates,
+  isValidTextHyperlinkUrl,
+} from "./textHyperlinkCore";
 
 import type { FontString } from "./types";
 
@@ -417,6 +426,56 @@ export type WrappedTextLine = {
   end: number;
 };
 
+export type TextHyperlinkWidthUnit = {
+  source: string;
+  width: number;
+  start: number;
+  end: number;
+  normalizedUrl: string | null;
+};
+
+export const expandLineToHyperlinkWidthUnits = (
+  line: string,
+  font: FontString,
+  lineStart: number,
+): TextHyperlinkWidthUnit[] => {
+  const units: TextHyperlinkWidthUnit[] = [];
+  for (const part of parseTextHyperlinkCandidates(line)) {
+    if (part.type === "plain") {
+      const slice = line.slice(part.start, part.end);
+      if (!slice) {
+        continue;
+      }
+      const tokens = parseTokens(slice);
+      let tokenOffset = lineStart + part.start;
+      for (const token of tokens) {
+        const tokenStart = tokenOffset;
+        const tokenEnd = tokenStart + token.length;
+        const w = getLineWidth(token, font);
+        units.push({
+          source: token,
+          width: w,
+          start: tokenStart,
+          end: tokenEnd,
+          normalizedUrl: null,
+        });
+        tokenOffset = tokenEnd;
+      }
+    } else {
+      const n = isValidTextHyperlinkUrl(part.urlRaw);
+      const display = n ? part.label : part.raw;
+      units.push({
+        source: part.raw,
+        width: getLineWidth(display, font),
+        start: lineStart + part.start,
+        end: lineStart + part.end,
+        normalizedUrl: n,
+      });
+    }
+  }
+  return units;
+};
+
 /**
  * Splits only on existing hard line breaks and preserves original offsets.
  */
@@ -459,7 +518,9 @@ export const getWrappedTextLines = (
   let offset = 0;
 
   for (const originalLine of text.split("\n")) {
-    const originalLineWidth = getLineWidth(originalLine, font);
+    const originalLineWidth = lineContainsHyperlinkSyntax(originalLine)
+      ? measureTextLineWidth(originalLine, font)
+      : getLineWidth(originalLine, font);
 
     if (originalLineWidth <= maxWidth) {
       lines.push({
@@ -483,12 +544,101 @@ export const getWrappedTextLines = (
  * The line-local offsets are tracked in original-text code units so
  * we can map the visual line back to the source.
  */
+const wrapLineWithHyperlinkUnits = (
+  line: string,
+  font: FontString,
+  maxWidth: number,
+  lineStart: number,
+): WrappedTextLine[] => {
+  const lines: WrappedTextLine[] = [];
+  const units = expandLineToHyperlinkWidthUnits(line, font, lineStart);
+
+  let currentLine = "";
+  let currentLineStart = lineStart;
+  let currentLineEnd = lineStart;
+  let currentLineWidth = 0;
+  let unitIndex = 0;
+
+  while (unitIndex < units.length) {
+    const unit = units[unitIndex];
+    const unitStart = unit.start;
+    const unitEnd = unit.end;
+    const testLine = currentLine + unit.source;
+
+    const testLineWidth =
+      isSingleCharacter(unit.source) && !unit.normalizedUrl
+        ? currentLineWidth + charWidth.calculate(unit.source, font)
+        : measureTextLineWidth(testLine, font);
+
+    if (/\s/.test(unit.source) || testLineWidth <= maxWidth) {
+      if (!currentLine) {
+        currentLineStart = unitStart;
+      }
+      currentLine = testLine;
+      currentLineEnd = unitEnd;
+      currentLineWidth = testLineWidth;
+      unitIndex++;
+      continue;
+    }
+
+    if (!currentLine) {
+      if (unit.normalizedUrl) {
+        lines.push({
+          text: unit.source,
+          start: unitStart,
+          end: unitEnd,
+        });
+        unitIndex++;
+        continue;
+      }
+      const wrappedWord = wrapWord(unit.source, font, maxWidth, unitStart);
+      const trailingLine = wrappedWord[wrappedWord.length - 1] ?? {
+        text: "",
+        start: unitStart,
+        end: unitStart,
+      };
+      const precedingLines = wrappedWord.slice(0, -1);
+      lines.push(...precedingLines);
+      currentLine = trailingLine.text;
+      currentLineStart = trailingLine.start;
+      currentLineEnd = trailingLine.end;
+      currentLineWidth = measureTextLineWidth(trailingLine.text, font);
+      unitIndex++;
+    } else {
+      lines.push(
+        trimLineEndAtSoftBreak(currentLine, currentLineStart, currentLineEnd),
+      );
+      currentLine = "";
+      currentLineStart = unitStart;
+      currentLineEnd = unitStart;
+      currentLineWidth = 0;
+    }
+  }
+
+  if (currentLine) {
+    const trailingLine = trimLine(
+      currentLine,
+      currentLineStart,
+      currentLineEnd,
+      font,
+      maxWidth,
+    );
+    lines.push(trailingLine);
+  }
+
+  return lines;
+};
+
 const wrapLine = (
   line: string,
   font: FontString,
   maxWidth: number,
   lineStart: number,
 ): WrappedTextLine[] => {
+  if (lineContainsHyperlinkSyntax(line)) {
+    return wrapLineWithHyperlinkUnits(line, font, maxWidth, lineStart);
+  }
+
   const lines: WrappedTextLine[] = [];
   const tokens = parseTokens(line);
 
@@ -540,7 +690,7 @@ const wrapLine = (
       currentLine = trailingLine.text;
       currentLineStart = trailingLine.start;
       currentLineEnd = trailingLine.end;
-      currentLineWidth = getLineWidth(trailingLine.text, font);
+      currentLineWidth = measureTextLineWidth(trailingLine.text, font);
       tokenOffset = tokenEnd;
       tokenIndex++;
     } else {
@@ -659,7 +809,7 @@ const trimLine = (
   font: FontString,
   maxWidth: number,
 ): WrappedTextLine => {
-  const shouldTrimWhitespaces = getLineWidth(line, font) > maxWidth;
+  const shouldTrimWhitespaces = measureTextLineWidth(line, font) > maxWidth;
 
   if (!shouldTrimWhitespaces) {
     return {
@@ -676,7 +826,7 @@ const trimLine = (
     "",
   ];
 
-  let trimmedLineWidth = getLineWidth(trimmedLine, font);
+  let trimmedLineWidth = measureTextLineWidth(trimmedLine, font);
 
   for (const whitespace of Array.from(whitespaces)) {
     const _charWidth = charWidth.calculate(whitespace, font);

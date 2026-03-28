@@ -7,6 +7,11 @@ import {
   normalizeEOL,
 } from "@excalidraw/common";
 
+import {
+  lineContainsHyperlinkSyntax,
+  toTextMeasurementLine,
+} from "./textHyperlinkCore";
+
 import type { FontString, ExcalidrawTextElement } from "./types";
 
 export const measureText = (
@@ -149,7 +154,7 @@ class CanvasTextMetricsProvider implements TextMetricsProvider {
   }
 }
 
-export const getLineWidth = (text: string, font: FontString) => {
+const getLineWidthRaw = (text: string, font: FontString) => {
   if (!textMetricsProvider) {
     textMetricsProvider = new CanvasTextMetricsProvider();
   }
@@ -157,11 +162,24 @@ export const getLineWidth = (text: string, font: FontString) => {
   return textMetricsProvider.getLineWidth(text, font);
 };
 
+export const getLineWidth = (text: string, font: FontString) => {
+  return getLineWidthRaw(text, font);
+};
+
+/** Single-line width for layout; `[label](url)` counts as `label` when valid. */
+export const measureTextLineWidth = (line: string, font: FontString) =>
+  lineContainsHyperlinkSyntax(line)
+    ? getLineWidthRaw(toTextMeasurementLine(line), font)
+    : getLineWidthRaw(line, font);
+
 export const getTextWidth = (text: string, font: FontString) => {
   const lines = splitIntoLines(text);
   let width = 0;
   lines.forEach((line) => {
-    width = Math.max(width, getLineWidth(line, font));
+    const measureLine = lineContainsHyperlinkSyntax(line)
+      ? toTextMeasurementLine(line)
+      : line;
+    width = Math.max(width, getLineWidthRaw(measureLine, font));
   });
 
   return width;

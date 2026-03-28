@@ -54,6 +54,11 @@ import {
 } from "./textElement";
 import { getLineHeightInPx } from "./textMeasurements";
 import {
+  getLinkFillColor,
+  getTextLineDrawSegments,
+} from "./textHyperlink";
+import { lineContainsHyperlinkSyntax } from "./textHyperlinkCore";
+import {
   isTextElement,
   isLinearElement,
   isFreeDrawElement,
@@ -582,12 +587,41 @@ const drawElementOnCanvas = (
           lineHeightPx,
         );
 
+        const font = getFontString(element);
+        const baseColor =
+          renderConfig.theme === THEME.DARK
+            ? applyDarkModeFilter(element.strokeColor)
+            : element.strokeColor;
+        const linkColor = getLinkFillColor(element.strokeColor, renderConfig.theme);
+
         for (let index = 0; index < lines.length; index++) {
-          context.fillText(
-            lines[index],
-            horizontalOffset,
-            index * lineHeightPx + verticalOffset,
-          );
+          const line = lines[index];
+          const y = index * lineHeightPx + verticalOffset;
+          if (!lineContainsHyperlinkSyntax(line)) {
+            context.fillText(line, horizontalOffset, y);
+            continue;
+          }
+          const prevAlign = context.textAlign;
+          context.textAlign = "left";
+          const segments = getTextLineDrawSegments(line, font, element);
+          for (const seg of segments) {
+            context.fillStyle = seg.normalizedUrl ? linkColor : baseColor;
+            context.fillText(seg.text, seg.xOffset, y);
+            if (seg.normalizedUrl) {
+              const m = context.measureText(seg.text);
+              const descent = m.actualBoundingBoxDescent ?? element.fontSize * 0.2;
+              const underlineY = y + Math.max(1, descent);
+              context.save();
+              context.strokeStyle = linkColor;
+              context.lineWidth = 0.08 * element.fontSize;
+              context.beginPath();
+              context.moveTo(seg.xOffset, underlineY);
+              context.lineTo(seg.xOffset + seg.width, underlineY);
+              context.stroke();
+              context.restore();
+            }
+          }
+          context.textAlign = prevAlign;
         }
         context.restore();
         if (shouldTemporarilyAttach) {

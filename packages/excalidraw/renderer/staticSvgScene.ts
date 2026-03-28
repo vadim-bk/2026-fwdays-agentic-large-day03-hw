@@ -10,6 +10,7 @@ import {
   getVerticalOffset,
   applyDarkModeFilter,
   MIME_TYPES,
+  getFontString,
 } from "@excalidraw/common";
 import { normalizeLink, toValidURL } from "@excalidraw/common";
 import { hashString } from "@excalidraw/element";
@@ -20,7 +21,12 @@ import {
 } from "@excalidraw/element";
 import { LinearElementEditor } from "@excalidraw/element";
 import { getBoundTextElement, getContainerElement } from "@excalidraw/element";
-import { getLineHeightInPx } from "@excalidraw/element";
+import {
+  getLineHeightInPx,
+  getLinkFillColor,
+  getTextLineDrawSegments,
+  lineContainsHyperlinkSyntax,
+} from "@excalidraw/element";
 import {
   isArrowElement,
   isIframeLikeElement,
@@ -668,23 +674,60 @@ const renderElementToSvg = (
             : element.textAlign === "right" || direction === "rtl"
             ? "end"
             : "start";
+        const baseFill =
+          renderConfig.theme === THEME.DARK
+            ? applyDarkModeFilter(element.strokeColor)
+            : element.strokeColor;
+        const linkFill = getLinkFillColor(element.strokeColor, renderConfig.theme);
+        const font = getFontString(element);
+
         for (let i = 0; i < lines.length; i++) {
+          const line = lines[i];
           const text = svgRoot.ownerDocument.createElementNS(SVG_NS, "text");
-          text.textContent = lines[i];
-          text.setAttribute("x", `${horizontalOffset}`);
           text.setAttribute("y", `${i * lineHeightPx + verticalOffset}`);
           text.setAttribute("font-family", getFontFamilyString(element));
           text.setAttribute("font-size", `${element.fontSize}px`);
-          text.setAttribute(
-            "fill",
-            renderConfig.theme === THEME.DARK
-              ? applyDarkModeFilter(element.strokeColor)
-              : element.strokeColor,
-          );
           text.setAttribute("text-anchor", textAnchor);
           text.setAttribute("style", "white-space: pre;");
           text.setAttribute("direction", direction);
           text.setAttribute("dominant-baseline", "alphabetic");
+
+          if (!lineContainsHyperlinkSyntax(line)) {
+            text.textContent = line;
+            text.setAttribute("x", `${horizontalOffset}`);
+            text.setAttribute("fill", baseFill);
+          } else {
+            text.setAttribute("x", "0");
+            text.setAttribute("text-anchor", "start");
+            const segments = getTextLineDrawSegments(line, font, element);
+            for (const seg of segments) {
+              const tspan = svgRoot.ownerDocument.createElementNS(
+                SVG_NS,
+                "tspan",
+              );
+              tspan.textContent = seg.text;
+              tspan.setAttribute("x", `${seg.xOffset}`);
+              tspan.setAttribute("fill", seg.normalizedUrl ? linkFill : baseFill);
+              if (seg.normalizedUrl) {
+                tspan.setAttribute(
+                  "text-decoration",
+                  "underline",
+                );
+                const anchor = svgRoot.ownerDocument.createElementNS(
+                  SVG_NS,
+                  "a",
+                );
+                anchor.setAttribute("href", normalizeLink(seg.normalizedUrl));
+                anchor.setAttribute("target", "_blank");
+                anchor.setAttribute("rel", "noopener noreferrer");
+                anchor.appendChild(tspan);
+                text.appendChild(anchor);
+              } else {
+                text.appendChild(tspan);
+              }
+            }
+          }
+
           node.appendChild(text);
         }
 
