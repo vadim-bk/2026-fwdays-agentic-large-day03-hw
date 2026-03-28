@@ -422,6 +422,7 @@ import { textWysiwyg } from "../wysiwyg/textWysiwyg";
 import { isOverScrollBars } from "../scene/scrollbars";
 
 import { isMaybeMermaidDefinition } from "../mermaid";
+import { isSafeMarkdownLinkUrl, tryParseMarkdownLink } from "../markdownLink";
 
 import { LassoTrail } from "../lasso";
 
@@ -5677,12 +5678,16 @@ class App extends React.Component<AppProps, AppState> {
   ) {
     const elementsMap = this.scene.getElementsMapIncludingDeleted();
 
-    const updateElement = (nextOriginalText: string, isDeleted: boolean) => {
+    const updateElement = (
+      nextOriginalText: string,
+      isDeleted: boolean,
+      linkToSet?: string | null,
+    ) => {
       this.scene.replaceAllElements([
         // Not sure why we include deleted elements as well hence using deleted elements map
         ...this.scene.getElementsIncludingDeleted().map((_element) => {
           if (_element.id === element.id && isTextElement(_element)) {
-            return newElementWith(_element, {
+            const textUpdates = {
               originalText: nextOriginalText,
               isDeleted: isDeleted ?? _element.isDeleted,
               // returns (wrapped) text and new dimensions
@@ -5692,7 +5697,13 @@ class App extends React.Component<AppProps, AppState> {
                 elementsMap,
                 nextOriginalText,
               ),
-            });
+            };
+            return newElementWith(
+              _element,
+              typeof linkToSet !== "undefined"
+                ? { ...textUpdates, link: linkToSet }
+                : textUpdates,
+            );
           }
           return _element;
         }),
@@ -5723,7 +5734,19 @@ class App extends React.Component<AppProps, AppState> {
       }),
       onSubmit: withBatchedUpdates(({ viaKeyboard, nextOriginalText }) => {
         const isDeleted = !nextOriginalText.trim();
-        updateElement(nextOriginalText, isDeleted);
+        let submittedText = nextOriginalText;
+        let linkToSet: string | null | undefined = undefined;
+        if (!isDeleted) {
+          const parsed = tryParseMarkdownLink(nextOriginalText);
+          if (parsed) {
+            const normalized = normalizeLink(parsed.url);
+            if (isSafeMarkdownLinkUrl(normalized)) {
+              submittedText = parsed.label;
+              linkToSet = normalized;
+            }
+          }
+        }
+        updateElement(submittedText, isDeleted, linkToSet);
 
         // keyboard-submit keeps focus on the edited object. For bound text, keep
         // the container selected even if the text becomes empty and is deleted.
