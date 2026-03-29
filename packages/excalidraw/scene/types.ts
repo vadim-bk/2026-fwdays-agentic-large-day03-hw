@@ -169,6 +169,7 @@ export type ElementShapes = {
   arrow: Drawable[];
   line: Drawable[];
   text: null;
+  code: null;
   image: null;
   frame: null;
   magicframe: null;

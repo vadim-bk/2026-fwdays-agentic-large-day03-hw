@@ -16,6 +16,7 @@ import {
   newImageElement,
   newLinearElement,
   newMagicFrameElement,
+  newCodeElement,
   newTextElement,
 } from "@excalidraw/element";
 
@@ -38,6 +39,7 @@ import type {
   ExcalidrawMagicFrameElement,
   ExcalidrawElbowArrowElement,
   ExcalidrawArrowElement,
+  ExcalidrawCodeElement,
   FixedSegment,
 } from "@excalidraw/element/types";
 
@@ -189,13 +191,26 @@ export class API {
     roughness?: ExcalidrawGenericElement["roughness"];
     opacity?: ExcalidrawGenericElement["opacity"];
     // text props
-    text?: T extends "text" ? ExcalidrawTextElement["text"] : never;
-    fontSize?: T extends "text" ? ExcalidrawTextElement["fontSize"] : never;
-    fontFamily?: T extends "text" ? ExcalidrawTextElement["fontFamily"] : never;
+    text?: T extends "text" | "code"
+      ? T extends "text"
+        ? ExcalidrawTextElement["text"]
+        : ExcalidrawCodeElement["text"]
+      : never;
+    fontSize?: T extends "text" | "code"
+      ? T extends "text"
+        ? ExcalidrawTextElement["fontSize"]
+        : ExcalidrawCodeElement["fontSize"]
+      : never;
+    fontFamily?: T extends "text" | "code"
+      ? T extends "text"
+        ? ExcalidrawTextElement["fontFamily"]
+        : ExcalidrawCodeElement["fontFamily"]
+      : never;
     textAlign?: T extends "text" ? ExcalidrawTextElement["textAlign"] : never;
     verticalAlign?: T extends "text"
       ? ExcalidrawTextElement["verticalAlign"]
       : never;
+    language?: T extends "code" ? ExcalidrawCodeElement["language"] : never;
     boundElements?: ExcalidrawGenericElement["boundElements"];
     containerId?: T extends "text"
       ? ExcalidrawTextElement["containerId"]
@@ -225,6 +240,8 @@ export class API {
     ? ExcalidrawFreeDrawElement
     : T extends "text"
     ? ExcalidrawTextElement
+    : T extends "code"
+    ? ExcalidrawCodeElement
     : T extends "image"
     ? ExcalidrawImageElement
     : T extends "frame"
@@ -312,6 +329,15 @@ export class API {
         });
         element.width = width;
         element.height = height;
+        break;
+      case "code":
+        element = newCodeElement({
+          ...base,
+          text: rest.text || "// code",
+          language:
+            typeof rest.language === "string" ? rest.language : null,
+          width: width || 320,
+        });
         break;
       case "freedraw":
         element = newFreeDrawElement({

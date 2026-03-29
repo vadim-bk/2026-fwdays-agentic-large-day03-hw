@@ -1041,7 +1041,7 @@ describe("textWysiwyg", () => {
 
       expect(text.fontFamily).toEqual(FONT_FAMILY.Excalifont);
 
-      fireEvent.click(screen.getByTitle(/code/i));
+      fireEvent.click(screen.getByTestId("font-family-code"));
 
       expect(
         (h.elements[1] as ExcalidrawTextElementWithContainer).fontFamily,
@@ -1467,7 +1467,7 @@ describe("textWysiwyg", () => {
       mouse.select(rectangle);
       Keyboard.keyPress(KEYS.ENTER);
 
-      fireEvent.click(screen.getByTitle(/code/i));
+      fireEvent.click(screen.getByTestId("font-family-code"));
 
       expect(
         (h.elements[1] as ExcalidrawTextElementWithContainer).fontFamily,
@@ -1495,7 +1495,7 @@ describe("textWysiwyg", () => {
       mouse.select(rectangle);
       Keyboard.keyPress(KEYS.ENTER);
 
-      fireEvent.click(screen.getByTitle(/code/i));
+      fireEvent.click(screen.getByTestId("font-family-code"));
       expect(
         (h.elements[1] as ExcalidrawTextElementWithContainer).fontFamily,
       ).toEqual(FONT_FAMILY["Comic Shanns"]);

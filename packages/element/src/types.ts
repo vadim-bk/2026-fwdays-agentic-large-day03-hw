@@ -192,6 +192,7 @@ export type ExcalidrawRectanguloidElement =
   | ExcalidrawRectangleElement
   | ExcalidrawImageElement
   | ExcalidrawTextElement
+  | ExcalidrawCodeElement
   | ExcalidrawFreeDrawElement
   | ExcalidrawIframeLikeElement
   | ExcalidrawFrameLikeElement
@@ -206,6 +207,7 @@ export type ExcalidrawRectanguloidElement =
 export type ExcalidrawElement =
   | ExcalidrawGenericElement
   | ExcalidrawTextElement
+  | ExcalidrawCodeElement
   | ExcalidrawLinearElement
   | ExcalidrawArrowElement
   | ExcalidrawFreeDrawElement
@@ -254,6 +256,23 @@ export type ExcalidrawTextElement = _ExcalidrawElementBase &
      *  with font size (using `getLineHeightInPx` helper).
      */
     lineHeight: number & { _brand: "unitlessLineHeight" };
+  }>;
+
+export type ExcalidrawCodeElement = _ExcalidrawElementBase &
+  Readonly<{
+    type: "code";
+    fontSize: number;
+    /** Always Cascadia for metrics; stored for serialization consistency. */
+    fontFamily: FontFamilyValues;
+    text: string;
+    textAlign: TextAlign;
+    verticalAlign: VerticalAlign;
+    originalText: string;
+    /** Code snippets use fixed width with soft wrap (same as non-autoResize text). */
+    autoResize: false;
+    lineHeight: number & { _brand: "unitlessLineHeight" };
+    /** Highlighter language id (e.g. `ts`, `python`); `null` for plain monospace. */
+    language: string | null;
   }>;
 
 export type ExcalidrawBindableElement =

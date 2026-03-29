@@ -7,7 +7,11 @@ import "@excalidraw/utils/test-utils";
 import { render } from "@excalidraw/excalidraw/tests/test-utils";
 
 import * as distance from "../src/distance";
-import { hitElementItself } from "../src/collision";
+import { hitElementItself, resetHitElementItselfCache } from "../src/collision";
+
+beforeEach(() => {
+  resetHitElementItselfCache();
+});
 
 describe("check rotated elements can be hit:", () => {
   beforeEach(async () => {
@@ -40,21 +44,6 @@ describe("check rotated elements can be hit:", () => {
 
 describe("hitElementItself cache", () => {
   beforeEach(async () => {
-    // reset cache
-    hitElementItself({
-      point: pointFrom<GlobalPoint>(50, 50),
-      element: API.createElement({
-        type: "rectangle",
-        x: 0,
-        y: 0,
-        width: 100,
-        height: 100,
-        backgroundColor: "#ffffff",
-      }),
-      threshold: Infinity,
-      elementsMap: new Map([]),
-    });
-
     localStorage.clear();
     await render(<Excalidraw handleKeyboardGlobally={true} />);
   });

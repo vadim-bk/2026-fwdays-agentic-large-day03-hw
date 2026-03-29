@@ -261,6 +261,7 @@ const getRelevantAppStateProps = (
   snapLines: appState.snapLines,
   zenModeEnabled: appState.zenModeEnabled,
   editingTextElement: appState.editingTextElement,
+  editingCodeElement: appState.editingCodeElement,
   isCropping: appState.isCropping,
   croppingElementId: appState.croppingElementId,
   searchMatches: appState.searchMatches,

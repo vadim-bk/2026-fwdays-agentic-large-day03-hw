@@ -33,6 +33,7 @@ import type {
   ExcalidrawNonSelectionElement,
   BindMode,
   ExcalidrawTextElement,
+  ExcalidrawCodeElement,
 } from "@excalidraw/element/types";
 
 import type {
@@ -150,6 +151,7 @@ export type ToolType =
   | "line"
   | "freedraw"
   | "text"
+  | "code"
   | "image"
   | "eraser"
   | "hand"
@@ -233,6 +235,7 @@ export type InteractiveCanvasAppState = Readonly<
     snapLines: AppState["snapLines"];
     zenModeEnabled: AppState["zenModeEnabled"];
     editingTextElement: AppState["editingTextElement"];
+    editingCodeElement: AppState["editingCodeElement"];
     // Cropping
     isCropping: AppState["isCropping"];
     croppingElementId: AppState["croppingElementId"];
@@ -329,6 +332,7 @@ export interface AppState {
    * set when a new text is created or when an existing text is being edited
    */
   editingTextElement: ExcalidrawTextElement | null;
+  editingCodeElement: ExcalidrawCodeElement | null;
   activeTool: {
     /**
      * indicates a previous tool we should revert back to if we deselect the
@@ -740,6 +744,7 @@ export type UIOptions = Partial<{
   canvasActions: CanvasActions;
   tools: {
     image: boolean;
+    code: boolean;
   };
   /**
    * Optionally control the editor form factor and desktop UI mode from the host app.

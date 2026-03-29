@@ -6,6 +6,8 @@ import {
   DEFAULT_TEXT_ALIGN,
   DEFAULT_VERTICAL_ALIGN,
   FONT_FAMILY,
+  TEXT_ALIGN,
+  VERTICAL_ALIGN,
   ROUNDNESS,
   DEFAULT_SIDEBAR,
   DEFAULT_ELEMENT_PROPS,
@@ -66,6 +68,7 @@ import type {
   ExcalidrawLinearElement,
   ExcalidrawSelectionElement,
   ExcalidrawTextElement,
+  ExcalidrawCodeElement,
   FixedPointBinding,
   FontFamilyValues,
   NonDeletedSceneElementsMap,
@@ -103,6 +106,7 @@ export const AllowedExcalidrawActiveTools: Record<
   selection: true,
   lasso: true,
   text: true,
+  code: true,
   rectangle: true,
   diamond: true,
   ellipse: true,
@@ -411,6 +415,47 @@ export const restoreElement = (
       }
 
       return element;
+    case "code": {
+      const fontSize = (element as ExcalidrawCodeElement).fontSize ?? 14;
+      const fontFamily =
+        (element as ExcalidrawCodeElement).fontFamily ?? FONT_FAMILY.Cascadia;
+      const text =
+        (typeof (element as ExcalidrawCodeElement).text === "string" &&
+          (element as ExcalidrawCodeElement).text) ||
+        "";
+      const lineHeight =
+        (element as ExcalidrawCodeElement).lineHeight ||
+        getLineHeight(fontFamily);
+      const languageRaw = (element as ExcalidrawCodeElement).language;
+      element = restoreElementWithProperties(
+        element as any,
+        {
+          fontSize,
+          fontFamily,
+          text,
+          textAlign:
+            (element as ExcalidrawCodeElement).textAlign || TEXT_ALIGN.LEFT,
+          verticalAlign:
+            (element as ExcalidrawCodeElement).verticalAlign ||
+            VERTICAL_ALIGN.TOP,
+          originalText: (element as ExcalidrawCodeElement).originalText || text,
+          autoResize: false,
+          lineHeight,
+          language:
+            typeof languageRaw === "string" && languageRaw.trim()
+              ? languageRaw
+              : null,
+        } as any,
+      );
+      if (opts?.deleteInvisibleElements && !text && !element.isDeleted) {
+        element = bumpVersion({
+          ...(element as ExcalidrawCodeElement),
+          originalText: text,
+          isDeleted: true,
+        });
+      }
+      return element;
+    }
     case "freedraw": {
       return restoreElementWithProperties(element, {
         points: element.points,

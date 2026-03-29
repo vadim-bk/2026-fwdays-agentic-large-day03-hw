@@ -21,6 +21,10 @@ import type { PointerDownState } from "@excalidraw/excalidraw/types";
 import type { Mutable } from "@excalidraw/common/utility-types";
 
 import {
+  CODE_SNIPPET_INNER_PADDING,
+  getCodeSnippetFontString,
+} from "./codeSnippetElement";
+import {
   getArrowLocalFixedPoints,
   unbindBindingElement,
   updateBoundElements,
@@ -55,6 +59,7 @@ import {
   isElbowArrow,
   isFrameLikeElement,
   isFreeDrawElement,
+  isCodeElement,
   isImageElement,
   isLinearElement,
   isTextElement,
@@ -70,6 +75,7 @@ import type {
   TransformHandleDirection,
 } from "./transformHandles";
 import type {
+  ExcalidrawCodeElement,
   ExcalidrawLinearElement,
   ExcalidrawTextElement,
   NonDeletedExcalidrawElement,
@@ -283,10 +289,21 @@ export const rescalePointsInElement = (
     : {};
 
 export const measureFontSizeFromWidth = (
-  element: NonDeleted<ExcalidrawTextElement>,
+  element:
+    | NonDeleted<ExcalidrawTextElement>
+    | NonDeleted<ExcalidrawCodeElement>,
   elementsMap: ElementsMap,
   nextWidth: number,
 ): { size: number } | null => {
+  if (isCodeElement(element)) {
+    const width = element.width;
+    const nextFontSize = element.fontSize * (nextWidth / width);
+    if (nextFontSize < MIN_FONT_SIZE) {
+      return null;
+    }
+    return { size: nextFontSize };
+  }
+
   // We only use width to scale font on resize
   let width = element.width;
 
@@ -398,6 +415,105 @@ export const resizeSingleTextElement = (
     };
 
     scene.mutateElement(element, resizedElement);
+  }
+};
+
+export const resizeSingleCodeSnippetElement = (
+  origElement: NonDeleted<ExcalidrawCodeElement>,
+  element: NonDeleted<ExcalidrawCodeElement>,
+  scene: Scene,
+  transformHandleType: TransformHandleDirection,
+  shouldResizeFromCenter: boolean,
+  nextWidth: number,
+  nextHeight: number,
+) => {
+  const elementsMap = scene.getNonDeletedElementsMap();
+
+  const metricsWidth = element.width * (nextHeight / element.height);
+
+  const metrics = measureFontSizeFromWidth(element, elementsMap, metricsWidth);
+  if (metrics === null) {
+    return;
+  }
+
+  if (transformHandleType.includes("n") || transformHandleType.includes("s")) {
+    const previousOrigin = pointFrom<GlobalPoint>(origElement.x, origElement.y);
+
+    const newOrigin = getResizedOrigin(
+      previousOrigin,
+      origElement.width,
+      origElement.height,
+      metricsWidth,
+      nextHeight,
+      origElement.angle,
+      transformHandleType,
+      false,
+      shouldResizeFromCenter,
+    );
+
+    const innerW = Math.max(0, metricsWidth - CODE_SNIPPET_INNER_PADDING * 2);
+    const wrapped = wrapText(
+      element.originalText,
+      getCodeSnippetFontString({ ...element, fontSize: metrics.size }),
+      innerW,
+    );
+
+    scene.mutateElement(element, {
+      fontSize: metrics.size,
+      width: metricsWidth,
+      height: nextHeight,
+      text: wrapped,
+      x: newOrigin.x,
+      y: newOrigin.y,
+    });
+    return;
+  }
+
+  if (transformHandleType === "e" || transformHandleType === "w") {
+    const minWidth =
+      getMinTextElementWidth(
+        getCodeSnippetFontString(element),
+        element.lineHeight,
+      ) +
+      CODE_SNIPPET_INNER_PADDING * 2;
+
+    const newWidth = Math.max(minWidth, nextWidth);
+
+    const inner = Math.max(0, newWidth - CODE_SNIPPET_INNER_PADDING * 2);
+    const text = wrapText(
+      element.originalText,
+      getCodeSnippetFontString(element),
+      inner,
+    );
+    const textMetrics = measureText(
+      text,
+      getCodeSnippetFontString(element),
+      element.lineHeight,
+    );
+
+    const newHeight = textMetrics.height + CODE_SNIPPET_INNER_PADDING * 2;
+
+    const previousOrigin = pointFrom<GlobalPoint>(origElement.x, origElement.y);
+
+    const newOrigin = getResizedOrigin(
+      previousOrigin,
+      origElement.width,
+      origElement.height,
+      newWidth,
+      newHeight,
+      element.angle,
+      transformHandleType,
+      false,
+      shouldResizeFromCenter,
+    );
+
+    scene.mutateElement(element, {
+      width: Math.abs(newWidth),
+      height: Math.abs(newHeight),
+      x: newOrigin.x,
+      y: newOrigin.y,
+      text,
+    });
   }
 };
 
@@ -739,6 +855,18 @@ export const resizeSingleElement = (
 ) => {
   if (isTextElement(latestElement) && isTextElement(origElement)) {
     return resizeSingleTextElement(
+      origElement,
+      latestElement,
+      scene,
+      handleDirection,
+      shouldResizeFromCenter,
+      nextWidth,
+      nextHeight,
+    );
+  }
+
+  if (isCodeElement(latestElement) && isCodeElement(origElement)) {
+    return resizeSingleCodeSnippetElement(
       origElement,
       latestElement,
       scene,
@@ -1309,6 +1437,7 @@ export const resizeMultipleElements = (
         (item) =>
           item.latest.angle !== 0 ||
           isTextElement(item.latest) ||
+          isCodeElement(item.latest) ||
           isInGroup(item.latest),
       );
 
@@ -1424,7 +1553,7 @@ export const resizeMultipleElements = (
         ];
       }
 
-      if (isTextElement(orig)) {
+      if (isTextElement(orig) || isCodeElement(orig)) {
         const metrics = measureFontSizeFromWidth(orig, elementsMap, width);
         if (!metrics) {
           return;

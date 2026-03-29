@@ -8,6 +8,7 @@ import type { MarkNonNullable } from "@excalidraw/common/utility-types";
 
 import type {
   ExcalidrawElement,
+  ExcalidrawCodeElement,
   ExcalidrawTextElement,
   ExcalidrawEmbeddableElement,
   ExcalidrawLinearElement,
@@ -67,6 +68,12 @@ export const isTextElement = (
   element: ExcalidrawElement | null,
 ): element is ExcalidrawTextElement => {
   return element != null && element.type === "text";
+};
+
+export const isCodeElement = (
+  element: ExcalidrawElement | null,
+): element is ExcalidrawCodeElement => {
+  return element != null && element.type === "code";
 };
 
 export const isFrameElement = (
@@ -219,6 +226,7 @@ export const isRectangularElement = (
     (element.type === "rectangle" ||
       element.type === "image" ||
       element.type === "text" ||
+      element.type === "code" ||
       element.type === "iframe" ||
       element.type === "embeddable" ||
       element.type === "frame" ||
@@ -250,6 +258,7 @@ export const isExcalidrawElement = (
   }
   switch (type) {
     case "text":
+    case "code":
     case "diamond":
     case "rectangle":
     case "iframe":

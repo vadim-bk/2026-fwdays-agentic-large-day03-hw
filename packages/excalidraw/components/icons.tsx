@@ -411,6 +411,16 @@ export const TextIcon = createIcon(
   tablerIconProps,
 );
 
+export const CodeSnippetIcon = createIcon(
+  <g strokeWidth="1.5" stroke="currentColor" fill="none">
+    <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+    <polyline points="16 18 22 12 16 6" />
+    <polyline points="8 6 2 12 8 18" />
+    <line x1="10" y1="4" x2="14" y2="20" />
+  </g>,
+  tablerIconProps,
+);
+
 export const TextSizeIcon = createIcon(
   <g stroke="currentColor" strokeWidth="1.5">
     <path stroke="none" d="M0 0h24v24H0z" fill="none" />

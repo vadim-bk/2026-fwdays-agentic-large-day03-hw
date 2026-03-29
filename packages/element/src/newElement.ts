@@ -4,6 +4,8 @@ import {
   DEFAULT_FONT_SIZE,
   DEFAULT_TEXT_ALIGN,
   DEFAULT_VERTICAL_ALIGN,
+  FONT_FAMILY,
+  TEXT_ALIGN,
   VERTICAL_ALIGN,
   randomInteger,
   randomId,
@@ -17,6 +19,10 @@ import type { Radians } from "@excalidraw/math";
 import type { MarkOptional, Merge } from "@excalidraw/common/utility-types";
 
 import {
+  CODE_SNIPPET_DEFAULT_FONT_SIZE,
+  CODE_SNIPPET_INNER_PADDING,
+} from "./codeSnippetElement";
+import {
   getElementAbsoluteCoords,
   getResizedElementAbsoluteCoords,
 } from "./bounds";
@@ -29,6 +35,7 @@ import { isLineElement } from "./typeChecks";
 
 import type {
   ExcalidrawElement,
+  ExcalidrawCodeElement,
   ExcalidrawImageElement,
   ExcalidrawTextElement,
   ExcalidrawLinearElement,
@@ -288,6 +295,60 @@ export const newTextElement = (
   );
 
   return textElement;
+};
+
+export const newCodeElement = (
+  opts: {
+    text?: string;
+    originalText?: string;
+    fontSize?: number;
+    language?: string | null;
+    width?: number;
+    fontFamily?: FontFamilyValues;
+  } & ElementConstructorOpts,
+): NonDeleted<ExcalidrawCodeElement> => {
+  const fontFamily = opts.fontFamily ?? FONT_FAMILY.Cascadia;
+  const fontSize = opts.fontSize ?? CODE_SNIPPET_DEFAULT_FONT_SIZE;
+  const lineHeight = getLineHeight(fontFamily);
+  const width = opts.width ?? 320;
+  const originalText = normalizeText(
+    opts.originalText ?? opts.text ?? "// code",
+  );
+  const innerWidth = Math.max(0, width - CODE_SNIPPET_INNER_PADDING * 2);
+  const wrapped = wrapText(
+    originalText,
+    getFontString({ fontFamily, fontSize }),
+    innerWidth,
+  );
+  const metrics = measureText(
+    wrapped,
+    getFontString({ fontFamily, fontSize }),
+    lineHeight,
+  );
+  const height = metrics.height + CODE_SNIPPET_INNER_PADDING * 2;
+
+  const base = _newElementBase<ExcalidrawCodeElement>("code", {
+    ...opts,
+    width,
+    height,
+  });
+
+  return newElementWith(
+    {
+      ...base,
+      type: "code",
+      fontSize,
+      fontFamily,
+      text: wrapped,
+      originalText,
+      textAlign: TEXT_ALIGN.LEFT,
+      verticalAlign: VERTICAL_ALIGN.TOP,
+      autoResize: false,
+      lineHeight,
+      language: opts.language ?? null,
+    },
+    {},
+  );
 };
 
 const getAdjustedDimensions = (

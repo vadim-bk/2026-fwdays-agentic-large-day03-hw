@@ -329,6 +329,7 @@ export const DEFAULT_UI_OPTIONS: AppProps["UIOptions"] = {
   },
   tools: {
     image: true,
+    code: true,
   },
 };
 
@@ -455,6 +456,7 @@ export const TOOL_TYPE = {
   freedraw: "freedraw",
   text: "text",
   image: "image",
+  code: "code",
   eraser: "eraser",
   hand: "hand",
   frame: "frame",

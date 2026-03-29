@@ -133,6 +133,7 @@ import {
   newImageElement,
   newLinearElement,
   newTextElement,
+  newCodeElement,
   refreshTextDimensions,
   deepCopyElement,
   duplicateElements,
@@ -156,6 +157,7 @@ import {
   isFlowchartNodeElement,
   isBindableElement,
   isTextElement,
+  isCodeElement,
   getNormalizedDimensions,
   isElementCompletelyInViewport,
   isElementInViewport,
@@ -268,6 +270,7 @@ import type {
   ExcalidrawGenericElement,
   ExcalidrawLinearElement,
   ExcalidrawTextElement,
+  ExcalidrawCodeElement,
   NonDeleted,
   InitializedExcalidrawImageElement,
   ExcalidrawImageElement,
@@ -419,6 +422,7 @@ import { LaserTrails } from "../laser-trails";
 import { withBatchedUpdates, withBatchedUpdatesThrottled } from "../reactUtils";
 import { isPointHittingTextAutoResizeHandle } from "../textAutoResizeHandle";
 import { textWysiwyg } from "../wysiwyg/textWysiwyg";
+import { codeSnippetWysiwyg } from "../wysiwyg/codeSnippetWysiwyg";
 import { isOverScrollBars } from "../scene/scrollbars";
 
 import { isMaybeMermaidDefinition } from "../mermaid";
@@ -2078,6 +2082,7 @@ class App extends React.Component<AppProps, AppState> {
         height: this.state.height,
         width: this.state.width,
         editingTextElement: this.state.editingTextElement,
+        editingCodeElement: this.state.editingCodeElement,
         newElementId: this.state.newElement?.id,
       });
     this.visibleElements = visibleElements;
@@ -2742,6 +2747,7 @@ class App extends React.Component<AppProps, AppState> {
     let didUpdate = false;
 
     let editingTextElement: AppState["editingTextElement"] | null = null;
+    let editingCodeElement: AppState["editingCodeElement"] | null = null;
     if (actionResult.elements) {
       this.scene.replaceAllElements(actionResult.elements);
       didUpdate = true;
@@ -2752,7 +2758,12 @@ class App extends React.Component<AppProps, AppState> {
       this.addNewImagesToImageCache();
     }
 
-    if (actionResult.appState || editingTextElement || this.state.contextMenu) {
+    if (
+      actionResult.appState ||
+      editingTextElement ||
+      editingCodeElement ||
+      this.state.contextMenu
+    ) {
       let viewModeEnabled = actionResult?.appState?.viewModeEnabled || false;
       let zenModeEnabled = actionResult?.appState?.zenModeEnabled || false;
       const theme =
@@ -2769,6 +2780,7 @@ class App extends React.Component<AppProps, AppState> {
       }
 
       editingTextElement = actionResult.appState?.editingTextElement || null;
+      editingCodeElement = actionResult.appState?.editingCodeElement || null;
 
       // make sure editingTextElement points to latest element reference
       if (actionResult.elements && editingTextElement) {
@@ -2784,8 +2796,25 @@ class App extends React.Component<AppProps, AppState> {
         });
       }
 
+      if (actionResult.elements && editingCodeElement) {
+        actionResult.elements.forEach((element) => {
+          if (
+            editingCodeElement?.id === element.id &&
+            editingCodeElement !== element &&
+            isNonDeletedElement(element) &&
+            isCodeElement(element)
+          ) {
+            editingCodeElement = element;
+          }
+        });
+      }
+
       if (editingTextElement?.isDeleted) {
         editingTextElement = null;
+      }
+
+      if (editingCodeElement?.isDeleted) {
+        editingCodeElement = null;
       }
 
       this.setState((prevAppState) => {
@@ -2799,6 +2828,7 @@ class App extends React.Component<AppProps, AppState> {
           // rewritten later
           contextMenu: null,
           editingTextElement,
+          editingCodeElement,
           viewModeEnabled,
           zenModeEnabled,
           theme,
@@ -3504,6 +3534,10 @@ class App extends React.Component<AppProps, AppState> {
     // in the editingTextElement being now a deleted element
     if (this.state.editingTextElement?.isDeleted) {
       this.setState({ editingTextElement: null });
+    }
+
+    if (this.state.editingCodeElement?.isDeleted) {
+      this.setState({ editingCodeElement: null });
     }
 
     this.store.commit(elementsMap, this.state);
@@ -5790,6 +5824,139 @@ class App extends React.Component<AppProps, AppState> {
     updateElement(element.originalText, false);
   }
 
+  private handleCodeSnippetWysiwyg(element: ExcalidrawCodeElement) {
+    codeSnippetWysiwyg({
+      id: element.id,
+      canvas: this.canvas,
+      getViewportCoords: (x, y) => {
+        const { x: viewportX, y: viewportY } = sceneCoordsToViewportCoords(
+          {
+            sceneX: x,
+            sceneY: y,
+          },
+          this.state,
+        );
+        return [
+          viewportX - this.state.offsetLeft,
+          viewportY - this.state.offsetTop,
+        ];
+      },
+      onSubmit: withBatchedUpdates(({ viaKeyboard }) => {
+        const current = this.scene.getElement(
+          element.id,
+        ) as ExcalidrawCodeElement | null;
+
+        const elementIdToSelect =
+          viaKeyboard && current && !current.isDeleted ? current.id : null;
+
+        if (elementIdToSelect) {
+          flushSync(() => {
+            this.setState((prevState) => ({
+              selectedElementIds: makeNextSelectedElementIds(
+                {
+                  ...prevState.selectedElementIds,
+                  [elementIdToSelect]: true,
+                },
+                prevState,
+              ),
+            }));
+          });
+        }
+
+        this.store.scheduleCapture();
+
+        flushSync(() => {
+          this.setState({
+            newElement: null,
+            editingCodeElement: null,
+          });
+        });
+
+        if (this.state.activeTool.locked) {
+          setCursorForShape(this.interactiveCanvas, this.state);
+        }
+
+        this.focusContainer();
+      }),
+      excalidrawContainer: this.excalidrawContainerRef.current,
+      app: this,
+    });
+    this.deselectElements();
+  }
+
+  private startCodeSnippetEditing({
+    element,
+  }: {
+    element: ExcalidrawCodeElement;
+  }) {
+    this.setState({ editingCodeElement: element });
+    this.handleCodeSnippetWysiwyg(element);
+  }
+
+  private handleCodeOnPointerDown = (
+    event: React.PointerEvent<HTMLElement>,
+    pointerDownState: PointerDownState,
+  ): void => {
+    if (this.state.editingCodeElement || this.state.editingTextElement) {
+      return;
+    }
+    const sceneX = pointerDownState.origin.x;
+    const sceneY = pointerDownState.origin.y;
+
+    const hit = this.getElementAtPosition(sceneX, sceneY);
+    if (hit && isCodeElement(hit)) {
+      this.startCodeSnippetEditing({ element: hit });
+      resetCursor(this.interactiveCanvas);
+      if (!this.state.activeTool.locked) {
+        this.setState({
+          activeTool: updateActiveTool(this.state, {
+            type: this.state.preferredSelectionTool.type,
+          }),
+        });
+      }
+      return;
+    }
+
+    const [gridX, gridY] = getGridPoint(
+      sceneX,
+      sceneY,
+      this.lastPointerDownEvent?.[KEYS.CTRL_OR_CMD]
+        ? null
+        : this.getEffectiveGridSize(),
+    );
+
+    const topLayerFrame = this.getTopLayerFrameAtSceneCoords({
+      x: gridX,
+      y: gridY,
+    });
+
+    const newElement = newCodeElement({
+      x: gridX,
+      y: gridY,
+      strokeColor: this.state.currentItemStrokeColor,
+      backgroundColor: this.state.currentItemBackgroundColor,
+      fillStyle: this.state.currentItemFillStyle,
+      strokeWidth: this.state.currentItemStrokeWidth,
+      strokeStyle: this.state.currentItemStrokeStyle,
+      roughness: this.state.currentItemRoughness,
+      opacity: this.state.currentItemOpacity,
+      roundness: null,
+      locked: false,
+      frameId: topLayerFrame ? topLayerFrame.id : null,
+    });
+
+    this.scene.insertElement(newElement);
+    this.startCodeSnippetEditing({ element: newElement });
+    resetCursor(this.interactiveCanvas);
+    if (!this.state.activeTool.locked) {
+      this.setState({
+        activeTool: updateActiveTool(this.state, {
+          type: this.state.preferredSelectionTool.type,
+        }),
+      });
+    }
+  };
+
   private deselectElements() {
     this.setState({
       selectedElementIds: makeNextSelectedElementIds({}, this.state),
@@ -6359,6 +6526,7 @@ class App extends React.Component<AppProps, AppState> {
   ) => {
     if (
       this.state.editingTextElement ||
+      this.state.editingCodeElement ||
       !this.shouldHandleBrowserCanvasDoubleClick(event.type)
     ) {
       return;
@@ -6507,6 +6675,11 @@ class App extends React.Component<AppProps, AppState> {
         this.setState({
           activeEmbeddable: { element: hitElement, state: "active" },
         });
+        return;
+      }
+
+      if (hitElement && isCodeElement(hitElement)) {
+        this.startCodeSnippetEditing({ element: hitElement });
         return;
       }
 
@@ -7234,10 +7407,15 @@ class App extends React.Component<AppProps, AppState> {
         !this.state.showHyperlinkPopup
       ) {
         this.setState({ showHyperlinkPopup: "info" });
-      } else if (this.state.activeTool.type === "text") {
+      } else if (
+        this.state.activeTool.type === "text" ||
+        this.state.activeTool.type === "code"
+      ) {
         setCursor(
           this.interactiveCanvas,
-          isTextElement(hitElement) ? CURSOR_TYPE.TEXT : CURSOR_TYPE.CROSSHAIR,
+          isTextElement(hitElement) || isCodeElement(hitElement)
+            ? CURSOR_TYPE.TEXT
+            : CURSOR_TYPE.CROSSHAIR,
         );
       } else if (this.state.viewModeEnabled) {
         setCursor(this.interactiveCanvas, CURSOR_TYPE.GRAB);
@@ -7249,7 +7427,8 @@ class App extends React.Component<AppProps, AppState> {
         // if using cmd/ctrl, we're not dragging
         !event[KEYS.CTRL_OR_CMD] &&
         // editing text -> don't show move cursor when hovering over its bbox
-        hitElement?.id !== this.state.editingTextElement?.id
+        hitElement?.id !== this.state.editingTextElement?.id &&
+        hitElement?.id !== this.state.editingCodeElement?.id
       ) {
         if (
           (hitElement ||
@@ -7720,6 +7899,7 @@ class App extends React.Component<AppProps, AppState> {
       this.state.activeTool.type === "selection" ||
       this.state.activeTool.type === "lasso" ||
       this.state.activeTool.type === "text" ||
+      this.state.activeTool.type === "code" ||
       this.state.activeTool.type === "image";
 
     if (!allowOnPointerDown) {
@@ -7841,6 +8021,8 @@ class App extends React.Component<AppProps, AppState> {
       }
     } else if (this.state.activeTool.type === "text") {
       this.handleTextOnPointerDown(event, pointerDownState);
+    } else if (this.state.activeTool.type === "code") {
+      this.handleCodeOnPointerDown(event, pointerDownState);
     } else if (
       this.state.activeTool.type === "arrow" ||
       this.state.activeTool.type === "line"
@@ -8047,7 +8229,7 @@ class App extends React.Component<AppProps, AppState> {
     this.focusContainer();
 
     // preventing defualt while text editing messes with cursor/focus
-    if (!this.state.editingTextElement) {
+    if (!this.state.editingTextElement && !this.state.editingCodeElement) {
       // necessary to prevent browser from scrolling the page if excalidraw
       // not full-page #4489
       //
@@ -8745,7 +8927,7 @@ class App extends React.Component<AppProps, AppState> {
     // if we're currently still editing text, clicking outside
     // should only finalize it, not create another (irrespective
     // of state.activeTool.locked)
-    if (this.state.editingTextElement) {
+    if (this.state.editingTextElement || this.state.editingCodeElement) {
       return;
     }
     let sceneX = pointerDownState.origin.x;
@@ -9794,6 +9976,7 @@ class App extends React.Component<AppProps, AppState> {
           selectedElements.length > 0 &&
           !pointerDownState.withCmdOrCtrl &&
           !this.state.editingTextElement &&
+          !this.state.editingCodeElement &&
           this.state.activeEmbeddable?.state !== "active"
         ) {
           const dragOffset = {
@@ -11261,6 +11444,26 @@ class App extends React.Component<AppProps, AppState> {
       if (
         activeTool.type === this.state.preferredSelectionTool.type &&
         !this.state.editingTextElement &&
+        !this.state.editingCodeElement &&
+        !pointerDownState.drag.hasOccurred &&
+        !pointerDownState.hit.wasAddedToSelection &&
+        !childEvent.shiftKey &&
+        !childEvent[KEYS.CTRL_OR_CMD] &&
+        !childEvent.altKey &&
+        childEvent.pointerType !== "touch" &&
+        hitElement &&
+        isCodeElement(hitElement) &&
+        this.state.selectedElementIds[hitElement.id] &&
+        this.scene.getSelectedElements(this.state).length === 1
+      ) {
+        this.startCodeSnippetEditing({ element: hitElement });
+        return;
+      }
+
+      if (
+        activeTool.type === this.state.preferredSelectionTool.type &&
+        !this.state.editingTextElement &&
+        !this.state.editingCodeElement &&
         !pointerDownState.drag.hasOccurred &&
         !pointerDownState.hit.wasAddedToSelection &&
         !childEvent.shiftKey &&

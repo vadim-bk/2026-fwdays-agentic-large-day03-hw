@@ -114,6 +114,15 @@ let cachedThreshold: number = Infinity;
 let cachedHit: boolean = false;
 let cachedOverrideShouldTestInside = false;
 
+/** Clears module-level hit-test memoization (see `hitElementItself`). */
+export const resetHitElementItselfCache = () => {
+  cachedPoint = null;
+  cachedElement = null;
+  cachedThreshold = Infinity;
+  cachedHit = false;
+  cachedOverrideShouldTestInside = false;
+};
+
 export const hitElementItself = ({
   point,
   element,
@@ -435,6 +444,7 @@ export const intersectElementWithLineSegment = (
     case "rectangle":
     case "image":
     case "text":
+    case "code":
     case "iframe":
     case "embeddable":
     case "frame":

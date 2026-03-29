@@ -69,10 +69,12 @@ export class Renderer {
     const getRenderableElements = ({
       elements,
       editingTextElement,
+      editingCodeElement,
       newElementId,
     }: {
       elements: readonly NonDeletedExcalidrawElement[];
       editingTextElement: AppState["editingTextElement"];
+      editingCodeElement: AppState["editingCodeElement"];
       newElementId: ExcalidrawElement["id"] | undefined;
     }) => {
       const elementsMap = toBrandedType<RenderableElementsMap>(new Map());
@@ -84,11 +86,13 @@ export class Renderer {
 
         // we don't want to render text element that's being currently edited
         // (it's rendered on remote only)
-        if (
-          !editingTextElement ||
-          editingTextElement.type !== "text" ||
-          element.id !== editingTextElement.id
-        ) {
+        const skipTextEdit =
+          editingTextElement &&
+          editingTextElement.type === "text" &&
+          element.id === editingTextElement.id;
+        const skipCodeEdit =
+          editingCodeElement && element.id === editingCodeElement.id;
+        if (!skipTextEdit && !skipCodeEdit) {
           elementsMap.set(element.id, element);
         }
       }
@@ -105,6 +109,7 @@ export class Renderer {
         height,
         width,
         editingTextElement,
+        editingCodeElement,
         newElementId,
         // cache-invalidation nonce
         sceneNonce: _sceneNonce,
@@ -117,6 +122,7 @@ export class Renderer {
         height: AppState["height"];
         width: AppState["width"];
         editingTextElement: AppState["editingTextElement"];
+        editingCodeElement: AppState["editingCodeElement"];
         /** note: first render of newElement will always bust the cache
          * (we'd have to prefilter elements outside of this function) */
         newElementId: ExcalidrawElement["id"] | undefined;
@@ -127,6 +133,7 @@ export class Renderer {
         const elementsMap = getRenderableElements({
           elements,
           editingTextElement,
+          editingCodeElement,
           newElementId,
         });
 

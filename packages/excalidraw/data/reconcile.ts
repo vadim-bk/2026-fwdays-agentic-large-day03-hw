@@ -29,6 +29,7 @@ export const shouldDiscardRemoteElement = (
     local &&
     // local element is being edited
     (local.id === localAppState.editingTextElement?.id ||
+      local.id === localAppState.editingCodeElement?.id ||
       local.id === localAppState.resizingElement?.id ||
       local.id === localAppState.newElement?.id ||
       // local element is newer

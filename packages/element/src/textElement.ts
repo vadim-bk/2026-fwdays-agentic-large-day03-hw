@@ -27,6 +27,7 @@ import { wrapText } from "./textWrapping";
 import {
   isBoundToContainer,
   isArrowElement,
+  isCodeElement,
   isTextElement,
 } from "./typeChecks";
 
@@ -522,7 +523,7 @@ export const getTextFromElements = (
 ) => {
   const text = elements
     .reduce((acc: string[], element) => {
-      if (isTextElement(element)) {
+      if (isTextElement(element) || isCodeElement(element)) {
         acc.push(element.text);
       }
       return acc;

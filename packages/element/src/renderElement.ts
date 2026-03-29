@@ -45,6 +45,7 @@ import type {
 import { getElementAbsoluteCoords, getElementBounds } from "./bounds";
 import { getUncroppedImageElement } from "./cropElement";
 import { LinearElementEditor } from "./linearElementEditor";
+import { drawCodeElementOnCanvas } from "./codeSnippetElement";
 import {
   getBoundTextElement,
   getContainerCoords,
@@ -54,6 +55,7 @@ import {
 } from "./textElement";
 import { getLineHeightInPx } from "./textMeasurements";
 import {
+  isCodeElement,
   isTextElement,
   isLinearElement,
   isFreeDrawElement,
@@ -69,6 +71,7 @@ import { getCornerRadius } from "./utils";
 import { ShapeCache } from "./shape";
 
 import type {
+  ExcalidrawCodeElement,
   ExcalidrawElement,
   ExcalidrawTextElement,
   NonDeletedExcalidrawElement,
@@ -94,6 +97,8 @@ const getCanvasPadding = (element: ExcalidrawElement) => {
     case "freedraw":
       return element.strokeWidth * 12;
     case "text":
+      return element.fontSize / 2;
+    case "code":
       return element.fontSize / 2;
     case "arrow":
       if (element.endArrowhead || element.endArrowhead) {
@@ -132,7 +137,9 @@ export const getRenderOpacity = (
 };
 
 export interface ExcalidrawElementWithCanvas {
-  element: ExcalidrawElement | ExcalidrawTextElement;
+  element: ExcalidrawElement | ExcalidrawTextElement | ExcalidrawCodeElement;
+  /** Snapshot of `element.version` when this cache was built (see `generateElementWithCanvas`). */
+  renderedWithElementVersion: number;
   canvas: HTMLCanvasElement;
   theme: AppState["theme"];
   scale: number;
@@ -322,6 +329,7 @@ const generateElementCanvas = (
 
   return {
     element,
+    renderedWithElementVersion: element.version,
     canvas,
     theme: appState.theme,
     scale,
@@ -544,7 +552,11 @@ const drawElementOnCanvas = (
       break;
     }
     default: {
-      if (isTextElement(element)) {
+      if (isCodeElement(element)) {
+        context.save();
+        drawCodeElementOnCanvas(element, context, renderConfig);
+        context.restore();
+      } else if (isTextElement(element)) {
         const rtl = isRTL(element.text);
         const shouldTemporarilyAttach = rtl && !context.canvas.isConnected;
         if (shouldTemporarilyAttach) {
@@ -631,6 +643,7 @@ const generateElementWithCanvas = (
   if (
     !prevElementWithCanvas ||
     shouldRegenerateBecauseZoom ||
+    prevElementWithCanvas.renderedWithElementVersion !== element.version ||
     prevElementWithCanvas.theme !== appState.theme ||
     prevElementWithCanvas.boundTextElementVersion !== boundTextElementVersion ||
     prevElementWithCanvas.imageCrop !== imageCrop ||
@@ -885,6 +898,7 @@ export const renderElement = (
     case "arrow":
     case "image":
     case "text":
+    case "code":
     case "iframe":
     case "embeddable": {
       if (renderConfig.isExporting) {

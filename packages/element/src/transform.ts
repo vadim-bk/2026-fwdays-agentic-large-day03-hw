@@ -3,6 +3,7 @@ import { pointFrom, type LocalPoint } from "@excalidraw/math";
 import {
   DEFAULT_FONT_FAMILY,
   DEFAULT_FONT_SIZE,
+  FONT_FAMILY,
   TEXT_ALIGN,
   VERTICAL_ALIGN,
   getSizeFromPoints,
@@ -19,6 +20,7 @@ import {
 import type { MarkOptional } from "@excalidraw/common/utility-types";
 
 import { bindBindingElement } from "./binding";
+import { CODE_SNIPPET_DEFAULT_FONT_SIZE } from "./codeSnippetElement";
 import {
   newArrowElement,
   newElement,
@@ -26,6 +28,7 @@ import {
   newImageElement,
   newLinearElement,
   newMagicFrameElement,
+  newCodeElement,
   newTextElement,
   type ElementConstructorOpts,
 } from "./newElement";
@@ -45,6 +48,7 @@ import { Scene } from "./Scene";
 import type {
   ExcalidrawArrowElement,
   ExcalidrawBindableElement,
+  ExcalidrawCodeElement,
   ExcalidrawElement,
   ExcalidrawFrameElement,
   ExcalidrawFreeDrawElement,
@@ -191,6 +195,13 @@ export type ExcalidrawElementSkeleton =
       y: number;
       id?: ExcalidrawTextElement["id"];
     } & Partial<ExcalidrawTextElement>)
+  | ({
+      type: "code";
+      text: string;
+      x: number;
+      y: number;
+      id?: ExcalidrawCodeElement["id"];
+    } & Partial<ExcalidrawCodeElement>)
   | ({
       type: Extract<ExcalidrawImageElement["type"], "image">;
       x: number;
@@ -594,6 +605,23 @@ export const convertToExcalidrawElements = (
           fontFamily,
           fontSize,
           ...element,
+        });
+        break;
+      }
+      case "code": {
+        const fontFamily = element.fontFamily ?? FONT_FAMILY.Cascadia;
+        const fontSize = element.fontSize ?? CODE_SNIPPET_DEFAULT_FONT_SIZE;
+        const text = element.text ?? "";
+        const normalizedText = normalizeText(text);
+        const width = element.width ?? 320;
+        excalidrawElement = newCodeElement({
+          ...element,
+          width,
+          fontFamily,
+          fontSize,
+          text: normalizedText,
+          originalText: element.originalText ?? normalizedText,
+          language: element.language ?? null,
         });
         break;
       }

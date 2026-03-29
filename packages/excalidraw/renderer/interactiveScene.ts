@@ -40,6 +40,7 @@ import {
   isLineElement,
   maxBindingDistance_simple,
   isTextElement,
+  isCodeElement,
   LinearElementEditor,
   getActiveTextElement,
 } from "@excalidraw/element";
@@ -75,6 +76,7 @@ import type {
   ExcalidrawImageElement,
   ExcalidrawLinearElement,
   ExcalidrawTextElement,
+  ExcalidrawCodeElement,
   GroupId,
   NonDeleted,
   NonDeletedSceneElementsMap,
@@ -1491,7 +1493,7 @@ const renderCropHandles = (
 };
 
 const renderTextBox = (
-  text: NonDeleted<ExcalidrawTextElement>,
+  text: NonDeleted<ExcalidrawTextElement> | NonDeleted<ExcalidrawCodeElement>,
   context: CanvasRenderingContext2D,
   appState: InteractiveCanvasAppState,
   selectionColor: InteractiveCanvasRenderConfig["selectionColor"],
@@ -1648,6 +1650,20 @@ const _renderInteractiveScene = ({
     if (textElement && !textElement.autoResize) {
       renderTextBox(
         textElement,
+        context,
+        appState,
+        renderConfig.selectionColor,
+      );
+    }
+  }
+
+  if (appState.editingCodeElement) {
+    const codeElement = allElementsMap.get(appState.editingCodeElement.id) as
+      | ExcalidrawCodeElement
+      | undefined;
+    if (codeElement && isCodeElement(codeElement)) {
+      renderTextBox(
+        codeElement,
         context,
         appState,
         renderConfig.selectionColor,
@@ -1908,6 +1924,7 @@ const _renderInteractiveScene = ({
         showBoundingBox &&
         // do not show transform handles when text is being edited
         !isTextElement(appState.editingTextElement) &&
+        !appState.editingCodeElement &&
         // do not show transform handles when image is being cropped
         !appState.croppingElementId
       ) {
