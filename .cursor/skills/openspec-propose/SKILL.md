@@ -9,6 +9,8 @@ metadata:
   generatedBy: "1.2.0"
 ---
 
+# OpenSpec Propose
+
 Propose a new change - create the change and generate all artifacts in one step.
 
 I'll create a change with artifacts:
@@ -63,9 +65,11 @@ When ready to implement, run /opsx:apply
    a. **For each artifact that is `ready` (dependencies satisfied)**:
 
    - Get instructions:
+
      ```bash
      openspec instructions <artifact-id> --change "<name>" --json
      ```
+
    - The instructions JSON includes:
      - `context`: Project background (constraints for you - do NOT include in output)
      - `rules`: Artifact-specific rules (constraints for you - do NOT include in output)
@@ -90,6 +94,7 @@ When ready to implement, run /opsx:apply
    - Then continue with creation
 
 5. **Show final status**
+
    ```bash
    openspec status --change "<name>"
    ```

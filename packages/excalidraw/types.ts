@@ -744,7 +744,7 @@ export type UIOptions = Partial<{
   canvasActions: CanvasActions;
   tools: {
     image: boolean;
-    code: boolean;
+    code?: boolean;
   };
   /**
    * Optionally control the editor form factor and desktop UI mode from the host app.

@@ -1,4 +1,4 @@
-import { KEYS, getFontFamilyString } from "@excalidraw/common";
+import { FONT_FAMILY, KEYS, getFontFamilyString } from "@excalidraw/common";
 
 import { refreshCodeSnippetDimensions } from "@excalidraw/element";
 
@@ -50,6 +50,7 @@ export const codeSnippetWysiwyg = ({
 
   let destroyed = false;
   let submittedViaKeyboard = false;
+  let focusTimerId: number | null = null;
 
   const wrapper = document.createElement("div");
   wrapper.className = "excalidraw-code-editor";
@@ -79,7 +80,7 @@ export const codeSnippetWysiwyg = ({
     border: "1px solid var(--color-gray-30)",
     borderRadius: "2px",
     resize: "none",
-    fontFamily: getFontFamilyString(element),
+    fontFamily: getFontFamilyString({ fontFamily: FONT_FAMILY.Cascadia }),
     fontSize: `${element.fontSize}px`,
     lineHeight: `${element.lineHeight}`,
     whiteSpace: "pre-wrap",
@@ -116,7 +117,9 @@ export const codeSnippetWysiwyg = ({
       top: `${vy - appState.offsetTop}px`,
     });
     textarea.style.fontSize = `${element.fontSize}px`;
-    textarea.style.fontFamily = getFontFamilyString(element);
+    textarea.style.fontFamily = getFontFamilyString({
+      fontFamily: FONT_FAMILY.Cascadia,
+    });
   };
 
   const applyText = (next: string) => {
@@ -153,6 +156,10 @@ export const codeSnippetWysiwyg = ({
   };
 
   const cleanup = () => {
+    if (focusTimerId !== null) {
+      window.clearTimeout(focusTimerId);
+      focusTimerId = null;
+    }
     textarea.oninput = null;
     textarea.onkeydown = null;
     window.removeEventListener("pointerdown", onPointerDown, {
@@ -198,7 +205,14 @@ export const codeSnippetWysiwyg = ({
     }
   };
 
-  setTimeout(() => {
+  focusTimerId = window.setTimeout(() => {
+    focusTimerId = null;
+    if (destroyed) {
+      return;
+    }
+    if (!textarea.isConnected) {
+      return;
+    }
     textarea.focus();
     textarea.select();
   }, 0);

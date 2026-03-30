@@ -4,6 +4,7 @@ import {
   SVG_NS,
   THEME,
   DARK_THEME_FILTER,
+  FONT_FAMILY,
   getFontFamilyString,
   isRTL,
   isTestEnv,
@@ -22,6 +23,11 @@ import {
 import { LinearElementEditor } from "@excalidraw/element";
 import { getBoundTextElement, getContainerElement } from "@excalidraw/element";
 import { getLineHeightInPx } from "@excalidraw/element";
+import {
+  CODE_SNIPPET_INNER_PADDING,
+  getTokenColor,
+  tokenizeCodeLine,
+} from "@excalidraw/element";
 import {
   isArrowElement,
   isIframeLikeElement,
@@ -661,7 +667,11 @@ const renderElementToSvg = (
           node.appendChild(bg);
         }
 
-        if (element.strokeWidth > 0) {
+        if (
+          element.strokeWidth > 0 &&
+          element.strokeColor &&
+          !isTransparent(element.strokeColor)
+        ) {
           const border = svgRoot.ownerDocument.createElementNS(SVG_NS, "rect");
           border.setAttribute("width", `${element.width}px`);
           border.setAttribute("height", `${element.height}px`);
@@ -682,27 +692,45 @@ const renderElementToSvg = (
           element.lineHeight,
         );
         const verticalOffset = getVerticalOffset(
-          element.fontFamily,
+          FONT_FAMILY.Cascadia,
           element.fontSize,
           lineHeightPx,
         );
-        const pad = 5;
-        const fillColor =
+        const pad = CODE_SNIPPET_INNER_PADDING;
+        const defaultFill =
           renderConfig.theme === THEME.DARK
             ? applyDarkModeFilter(element.strokeColor)
             : element.strokeColor;
         for (let i = 0; i < lines.length; i++) {
           const text = svgRoot.ownerDocument.createElementNS(SVG_NS, "text");
-          text.textContent = lines[i];
           text.setAttribute("x", `${pad}`);
           text.setAttribute("y", `${pad + i * lineHeightPx + verticalOffset}`);
-          text.setAttribute("font-family", getFontFamilyString(element));
+          text.setAttribute(
+            "font-family",
+            getFontFamilyString({ fontFamily: FONT_FAMILY.Cascadia }),
+          );
           text.setAttribute("font-size", `${element.fontSize}px`);
-          text.setAttribute("fill", fillColor);
+          text.setAttribute("fill", defaultFill);
           text.setAttribute("text-anchor", "start");
           text.setAttribute("style", "white-space: pre;");
+          text.setAttribute("xml:space", "preserve");
           text.setAttribute("direction", "ltr");
           text.setAttribute("dominant-baseline", "alphabetic");
+
+          const tokens = tokenizeCodeLine(lines[i]!, element.language);
+          for (const token of tokens) {
+            const tspan = svgRoot.ownerDocument.createElementNS(SVG_NS, "tspan");
+            tspan.textContent = token.text;
+            tspan.setAttribute(
+              "fill",
+              getTokenColor(
+                token.kind,
+                renderConfig.theme === THEME.DARK ? THEME.DARK : THEME.LIGHT,
+                defaultFill,
+              ),
+            );
+            text.appendChild(tspan);
+          }
           node.appendChild(text);
         }
 

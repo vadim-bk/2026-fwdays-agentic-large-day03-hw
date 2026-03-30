@@ -1,4 +1,4 @@
-## Context
+# Context
 
 Excalidraw today models free-form labels as `ExcalidrawTextElement` (`type: "text"`) with font metrics, wrapping, and canvas rendering via `fillText` per line in `packages/element` ([`renderElement.ts`](../../../packages/element/src/renderElement.ts)). There is no dedicated construct for monospace code or syntax-colored tokens. The product rule set disallows DOM/React for the main drawing surface and discourages new npm dependencies without approval, so highlighting and layout must fit the existing 2D canvas (and static SVG) pipeline.
 

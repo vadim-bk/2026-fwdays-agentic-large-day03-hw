@@ -202,10 +202,40 @@ const tokenizeJsLikeLine = (line: string): CodeToken[] => {
     }
 
     if (/\d/.test(c) || (c === "." && /\d/.test(line[i + 1] || ""))) {
-      let j = i + 1;
-      while (j < line.length && /[0-9.eE+-]/.test(line[j]!)) {
+      // Parse a number token deterministically to avoid false positives such as
+      // "1.2.3" or "1e+2+3" being consumed as a single number.
+      let j = i;
+
+      while (j < line.length && /\d/.test(line[j]!)) {
         j++;
       }
+
+      if (line[j] === "." && /\d/.test(line[j + 1] || "")) {
+        j++; // "."
+        while (j < line.length && /\d/.test(line[j]!)) {
+          j++;
+        }
+      }
+
+      if (line[j] === "e" || line[j] === "E") {
+        const expStart = j;
+        j++; // "e" | "E"
+
+        if (line[j] === "+" || line[j] === "-") {
+          j++;
+        }
+
+        const expDigitsStart = j;
+        while (j < line.length && /\d/.test(line[j]!)) {
+          j++;
+        }
+
+        // Roll back if exponent has no digits (e.g. "1e", "1e+").
+        if (expDigitsStart === j) {
+          j = expStart;
+        }
+      }
+
       push(line.slice(i, j), "number");
       i = j;
       continue;

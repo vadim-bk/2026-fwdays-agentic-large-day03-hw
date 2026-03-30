@@ -9,6 +9,8 @@ metadata:
   generatedBy: "1.2.0"
 ---
 
+# OpenSpec Apply Change
+
 Implement tasks from an OpenSpec change.
 
 **Input**: Optionally specify a change name. If omitted, check if it can be inferred from conversation context. If vague or ambiguous you MUST prompt for available changes.
@@ -164,4 +166,4 @@ What would you like to do?
 This skill supports the "actions on a change" model:
 
 - **Can be invoked anytime**: Before all artifacts are done (if tasks exist), after partial implementation, interleaved with other actions
-- **Allows artifact updates**: If implementation reveals design issues, suggest updating artifacts - not phase-locked, work fluidly
+- **Supports artifact updates**: If implementation exposes design issues, suggest updating artifacts — this workflow isn’t phase-locked; iterate fluidly

@@ -80,11 +80,13 @@ export const drawCodeElementOnCanvas = (
     context.fillRect(0, 0, element.width, element.height);
   }
 
-  if (element.strokeWidth > 0) {
-    context.strokeStyle =
-      theme === THEME.DARK
-        ? applyDarkModeFilter(element.strokeColor)
-        : element.strokeColor;
+  const strokeColor =
+    theme === THEME.DARK
+      ? applyDarkModeFilter(element.strokeColor)
+      : element.strokeColor;
+
+  if (element.strokeWidth > 0 && strokeColor && !isTransparent(strokeColor)) {
+    context.strokeStyle = strokeColor;
     context.lineWidth = element.strokeWidth;
     context.strokeRect(0, 0, element.width, element.height);
   }
