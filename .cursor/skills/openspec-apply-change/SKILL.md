@@ -166,4 +166,4 @@ What would you like to do?
 This skill supports the "actions on a change" model:
 
 - **Can be invoked anytime**: Before all artifacts are done (if tasks exist), after partial implementation, interleaved with other actions
-- **Supports artifact updates**: If implementation exposes design issues, suggest updating artifacts — this workflow isn’t phase-locked; iterate fluidly
+- **Supports artifact updates**: If implementation reveals design issues, suggest updating artifacts; this workflow stays iterative rather than locked to strict phases

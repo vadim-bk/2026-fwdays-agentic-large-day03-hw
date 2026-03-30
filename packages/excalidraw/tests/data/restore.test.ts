@@ -1,7 +1,13 @@
 import { pointFrom } from "@excalidraw/math";
 import { vi } from "vitest";
 
-import { DEFAULT_SIDEBAR, FONT_FAMILY, ROUNDNESS } from "@excalidraw/common";
+import {
+  DEFAULT_FONT_FAMILY,
+  DEFAULT_FONT_SIZE,
+  DEFAULT_SIDEBAR,
+  FONT_FAMILY,
+  ROUNDNESS,
+} from "@excalidraw/common";
 
 import { newElementWith } from "@excalidraw/element";
 import * as sizeHelpers from "@excalidraw/element";
@@ -10,6 +16,7 @@ import type { LocalPoint } from "@excalidraw/math";
 
 import type {
   ExcalidrawArrowElement,
+  ExcalidrawCodeElement,
   ExcalidrawElement,
   ExcalidrawFreeDrawElement,
   ExcalidrawLinearElement,
@@ -101,6 +108,45 @@ describe("restoreElements", () => {
       seed: expect.any(Number),
       versionNonce: expect.any(Number),
     });
+  });
+
+  it("should use shared defaults for text without font props", () => {
+    const textElement: any = {
+      ...API.createElement({
+        type: "text",
+        text: "hello",
+      }),
+      fontSize: undefined,
+      fontFamily: undefined,
+    };
+    delete textElement.font;
+
+    const restoredText = restore.restoreElements(
+      [textElement],
+      null,
+    )[0] as ExcalidrawTextElement;
+
+    expect(restoredText.fontSize).toBe(DEFAULT_FONT_SIZE);
+    expect(restoredText.fontFamily).toBe(DEFAULT_FONT_FAMILY);
+  });
+
+  it("should recalculate code element dimensions during restore", () => {
+    const codeElement = {
+      ...API.createElement({
+        type: "code",
+        text: "const a = 1;",
+      }),
+      originalText: "const a = 1;",
+      width: 0,
+      height: 0,
+    };
+
+    const restoredCode = restore.restoreElements(
+      [codeElement],
+      null,
+    )[0] as ExcalidrawCodeElement;
+
+    expect(restoredCode.height).toBeGreaterThan(0);
   });
 
   it("should not delete empty text element when opts.deleteInvisibleElements is not defined", () => {

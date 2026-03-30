@@ -2746,8 +2746,10 @@ class App extends React.Component<AppProps, AppState> {
 
     let didUpdate = false;
 
-    let editingTextElement: AppState["editingTextElement"] | null = null;
-    let editingCodeElement: AppState["editingCodeElement"] | null = null;
+    let editingTextElement: AppState["editingTextElement"] =
+      this.state.editingTextElement;
+    let editingCodeElement: AppState["editingCodeElement"] =
+      this.state.editingCodeElement;
     if (actionResult.elements) {
       this.scene.replaceAllElements(actionResult.elements);
       didUpdate = true;
@@ -2779,8 +2781,24 @@ class App extends React.Component<AppProps, AppState> {
         zenModeEnabled = this.props.zenModeEnabled;
       }
 
-      editingTextElement = actionResult.appState?.editingTextElement || null;
-      editingCodeElement = actionResult.appState?.editingCodeElement || null;
+      if (
+        actionResult.appState &&
+        "editingTextElement" in actionResult.appState
+      ) {
+        const nextEditingTextElement = actionResult.appState.editingTextElement;
+        if (nextEditingTextElement !== undefined) {
+          editingTextElement = nextEditingTextElement;
+        }
+      }
+      if (
+        actionResult.appState &&
+        "editingCodeElement" in actionResult.appState
+      ) {
+        const nextEditingCodeElement = actionResult.appState.editingCodeElement;
+        if (nextEditingCodeElement !== undefined) {
+          editingCodeElement = nextEditingCodeElement;
+        }
+      }
 
       // make sure editingTextElement points to latest element reference
       if (actionResult.elements && editingTextElement) {
@@ -7411,11 +7429,13 @@ class App extends React.Component<AppProps, AppState> {
         this.state.activeTool.type === "text" ||
         this.state.activeTool.type === "code"
       ) {
+        const shouldShowTextCursor =
+          (this.state.activeTool.type === "text" &&
+            isTextElement(hitElement)) ||
+          (this.state.activeTool.type === "code" && isCodeElement(hitElement));
         setCursor(
           this.interactiveCanvas,
-          isTextElement(hitElement) || isCodeElement(hitElement)
-            ? CURSOR_TYPE.TEXT
-            : CURSOR_TYPE.CROSSHAIR,
+          shouldShowTextCursor ? CURSOR_TYPE.TEXT : CURSOR_TYPE.CROSSHAIR,
         );
       } else if (this.state.viewModeEnabled) {
         setCursor(this.interactiveCanvas, CURSOR_TYPE.GRAB);
