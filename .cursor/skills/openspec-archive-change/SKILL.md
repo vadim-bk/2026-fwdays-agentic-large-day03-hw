@@ -23,7 +23,17 @@ Archive a completed change in the experimental workflow.
 
    **IMPORTANT**: Do NOT guess or auto-select a change. Always let the user choose.
 
-2. **Check artifact completion status**
+2. **Validate and resolve the change name (security gate)**
+
+   Before any path/file operation:
+
+   - Run `openspec list --json` and build an allowlist of active change names.
+   - Accept `<name>` only if it exists in that allowlist.
+   - Enforce slug format: `^[a-z0-9][a-z0-9-]*$`
+   - Reject names containing `/`, `\`, `..`, spaces, or any character outside the slug pattern.
+   - On validation failure: stop with a clear error and do not continue.
+
+3. **Check artifact completion status**
 
    Run `openspec status --change "<name>" --json` to check artifact completion.
 
@@ -38,7 +48,7 @@ Archive a completed change in the experimental workflow.
    - Use **AskUserQuestion tool** to confirm user wants to proceed
    - Proceed if user confirms
 
-3. **Check task completion status**
+4. **Check task completion status**
 
    Read the tasks file (typically `tasks.md`) to check for incomplete tasks.
 
@@ -52,7 +62,7 @@ Archive a completed change in the experimental workflow.
 
    **If no tasks file exists:** Proceed without task-related warning.
 
-4. **Assess delta spec sync state**
+5. **Assess delta spec sync state**
 
    Check for delta specs at `openspec/changes/<name>/specs/`. If none exist, proceed without sync prompt.
 
@@ -64,12 +74,16 @@ Archive a completed change in the experimental workflow.
 
    **Prompt options:**
 
-   - If changes needed: "Sync now (recommended)", "Archive without syncing"
+   - If changes needed: "Sync now (recommended)", "Archive without syncing", "Cancel"
    - If already synced: "Archive now", "Sync anyway", "Cancel"
 
-   If user chooses sync, use Task tool (subagent_type: "general-purpose", prompt: "Use Skill tool to invoke openspec-sync-specs for change '<name>'. Delta spec analysis: <include the analyzed delta spec summary>"). Proceed to archive regardless of choice.
+   If user chooses sync, use Task tool (subagent_type: "general-purpose", prompt: "Use Skill tool to invoke openspec-sync-specs for change '<name>'. Delta spec analysis: <include the analyzed delta spec summary>") and then continue.
+   If user chooses "Archive without syncing", continue without sync.
+   If user chooses "Cancel", stop immediately and do not archive.
 
-5. **Perform the archive**
+6. **Perform the archive**
+
+   Use only the **same validated change name from step 2** when building paths—never substitute unvalidated or user-typed strings.
 
    Create the archive directory if it doesn't exist:
 
@@ -78,6 +92,11 @@ Archive a completed change in the experimental workflow.
    ```
 
    Generate target name using current date: `YYYY-MM-DD-<change-name>`
+
+   **Before `mv`, verify containment (fail with a clear error if not):**
+
+   - Resolved source path must be exactly the directory `openspec/changes/<validated-name>` (a single path segment under `openspec/changes/`, no `..` or extra segments).
+   - Resolved destination must be under `openspec/changes/archive/` only (e.g. `openspec/changes/archive/YYYY-MM-DD-<validated-name>`).
 
    **Check if target already exists:**
 
@@ -88,7 +107,9 @@ Archive a completed change in the experimental workflow.
    mv openspec/changes/<name> openspec/changes/archive/YYYY-MM-DD-<name>
    ```
 
-6. **Display summary**
+   (`<name>` here means the validated slug from step 2, substituted as a single path component.)
+
+7. **Display summary**
 
    Show archive completion summary including:
 
@@ -114,9 +135,12 @@ All artifacts complete. All tasks complete.
 **Guardrails**
 
 - Always prompt for change selection if not provided
+- Validate change names against `openspec list --json` and slug pattern `^[a-z0-9][a-z0-9-]*$` before using in paths
+- Reject path traversal/path injection inputs (`..`, `/`, `\`, etc.)
 - Use artifact graph (openspec status --json) for completion checking
 - Don't block archive on warnings - just inform and confirm
 - Preserve .openspec.yaml when moving to archive (it moves with the directory)
 - Show clear summary of what happened
 - If sync is requested, use openspec-sync-specs approach (agent-driven)
 - If delta specs exist, always run the sync assessment and show the combined summary before prompting
+- If user chooses "Cancel" at sync prompt, exit without archiving

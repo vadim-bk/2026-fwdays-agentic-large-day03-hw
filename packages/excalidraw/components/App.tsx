@@ -3579,8 +3579,8 @@ class App extends React.Component<AppProps, AppState> {
       currentScrollBars = scrollBars;
     }
     const scrolledOutside =
-      // hide when editing text
-      this.state.editingTextElement
+      // hide when editing text or code (those elements are omitted from visibleElements)
+      this.state.editingTextElement || this.state.editingCodeElement
         ? false
         : !atLeastOneVisibleElement && elementsMap.size > 0;
     if (this.state.scrolledOutside !== scrolledOutside) {
@@ -7280,6 +7280,7 @@ class App extends React.Component<AppProps, AppState> {
         this.state.activeTool.type !== "selection" &&
         this.state.activeTool.type !== "lasso" &&
         this.state.activeTool.type !== "text" &&
+        this.state.activeTool.type !== "code" &&
         this.state.activeTool.type !== "eraser")
     ) {
       return;
