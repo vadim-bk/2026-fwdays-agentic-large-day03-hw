@@ -5229,15 +5229,7 @@ class App extends React.Component<AppProps, AppState> {
               }
             }
           } else if (isCodeElement(selectedElement)) {
-            this.startCodeSnippetEditing({ element: selectedElement });
-            resetCursor(this.interactiveCanvas);
-            if (!this.state.activeTool.locked) {
-              this.setState({
-                activeTool: updateActiveTool(this.state, {
-                  type: this.state.preferredSelectionTool.type,
-                }),
-              });
-            }
+            this.enterCodeSnippetEditing(selectedElement);
             event.preventDefault();
             return;
           } else if (
@@ -5923,6 +5915,18 @@ class App extends React.Component<AppProps, AppState> {
     this.handleCodeSnippetWysiwyg(element);
   }
 
+  private enterCodeSnippetEditing(element: ExcalidrawCodeElement) {
+    this.startCodeSnippetEditing({ element });
+    resetCursor(this.interactiveCanvas);
+    if (!this.state.activeTool.locked) {
+      this.setState({
+        activeTool: updateActiveTool(this.state, {
+          type: this.state.preferredSelectionTool.type,
+        }),
+      });
+    }
+  }
+
   private handleCodeOnPointerDown = (
     event: React.PointerEvent<HTMLElement>,
     pointerDownState: PointerDownState,
@@ -5935,15 +5939,7 @@ class App extends React.Component<AppProps, AppState> {
 
     const hit = this.getElementAtPosition(sceneX, sceneY);
     if (hit && isCodeElement(hit)) {
-      this.startCodeSnippetEditing({ element: hit });
-      resetCursor(this.interactiveCanvas);
-      if (!this.state.activeTool.locked) {
-        this.setState({
-          activeTool: updateActiveTool(this.state, {
-            type: this.state.preferredSelectionTool.type,
-          }),
-        });
-      }
+      this.enterCodeSnippetEditing(hit);
       return;
     }
 
@@ -5976,15 +5972,7 @@ class App extends React.Component<AppProps, AppState> {
     });
 
     this.scene.insertElement(newElement);
-    this.startCodeSnippetEditing({ element: newElement });
-    resetCursor(this.interactiveCanvas);
-    if (!this.state.activeTool.locked) {
-      this.setState({
-        activeTool: updateActiveTool(this.state, {
-          type: this.state.preferredSelectionTool.type,
-        }),
-      });
-    }
+    this.enterCodeSnippetEditing(newElement);
   };
 
   private deselectElements() {
@@ -12794,6 +12782,13 @@ class App extends React.Component<AppProps, AppState> {
     (
       event: WheelEvent | React.WheelEvent<HTMLDivElement | HTMLCanvasElement>,
     ) => {
+      if (
+        event.target instanceof HTMLTextAreaElement &&
+        this.state.editingCodeElement
+      ) {
+        return;
+      }
+
       if (
         !(
           event.target instanceof HTMLCanvasElement ||
