@@ -7,17 +7,15 @@ description: Archive a completed change in the experimental workflow
 
 Archive a completed change in the experimental workflow.
 
-**Input**: Optionally specify a change name after `/opsx:archive` (e.g., `/opsx:archive add-auth`). If omitted, check if it can be inferred from conversation context. If vague or ambiguous you MUST prompt for available changes.
+**Input**: Optionally specify a change name after `/opsx:archive` (e.g., `/opsx:archive add-auth`). If omitted, infer from conversation context when the active change is unambiguous; if vague, ambiguous, or several changes could apply, you MUST use **AskUserQuestion** (after `openspec list --json`) so the user picks.
 
 **Steps**
 
-1. **If no change name provided, prompt for selection**
+1. **Resolve the change name**
 
-   Run `openspec list --json` to get available changes. Use the **AskUserQuestion tool** to let the user select.
+   If the user did not pass a name: infer it when there is a single clear match from context (e.g. one active change explicitly in focus). If inference is weak, multiple active changes exist, or the target is unclear, run `openspec list --json`, show only active changes (not already archived), include each change’s schema when available, and use the **AskUserQuestion tool** so the user selects.
 
-   Show only active changes (not already archived). Include the schema used for each change if available.
-
-   **IMPORTANT**: Do NOT guess or auto-select a change. Always let the user choose.
+   **IMPORTANT**: Do not guess or auto-select when more than one active change could apply or context is ambiguous—always confirm via **AskUserQuestion** in those cases.
 
 2. **Validate and resolve the change name (security gate)**
 
@@ -46,17 +44,21 @@ Archive a completed change in the experimental workflow.
 
 4. **Check task completion status**
 
-   Read the tasks file (typically `tasks.md`) to check for incomplete tasks.
+   Resolve where tasks live and whether to run this check:
 
-   Count tasks marked with `- [ ]` (incomplete) vs `- [x]` (complete).
+   - Prefer `openspec status --change "<name>" --json` (and schema metadata under the change) for a tasks artifact path, `tasksFile`, or a flag such as `skipTaskCheck` when the schema does not use checkbox task lists.
+   - If the schema opts out (`skipTaskCheck` or equivalent), skip this step entirely.
+   - Otherwise discover the tasks source: use the resolved `tasksFile` if present; else try common locations (e.g. `openspec/changes/<name>/tasks.md`, `tasks.json`, or paths referenced in change metadata). Only run the incomplete-task logic when a concrete file is found and task checks are allowed.
 
-   **If incomplete tasks found:**
+   For markdown checkbox lists, count `- [ ]` (incomplete) vs `- [x]` (complete). For other formats, use the schema-appropriate markers only if applicable; if the file is not a checkbox list, skip counting and proceed without this warning unless the schema defines another rule.
+
+   **If incomplete tasks found (checkbox flow):**
 
    - Display warning showing count of incomplete tasks
    - Prompt user for confirmation to continue
    - Proceed if user confirms
 
-   **If no tasks file exists:** Proceed without task-related warning.
+   **If no eligible tasks file exists or task checks are skipped:** Proceed without task-related warning.
 
 5. **Assess delta spec sync state**
 
@@ -73,9 +75,12 @@ Archive a completed change in the experimental workflow.
    - If changes needed: "Sync now (recommended)", "Archive without syncing", "Cancel"
    - If already synced: "Archive now", "Sync anyway", "Cancel"
 
-   If user chooses sync, use Task tool (subagent_type: "general-purpose", prompt: "Use Skill tool to invoke openspec-sync-specs for change '<name>'. Delta spec analysis: <include the analyzed delta spec summary>") and then continue.
-   If user chooses "Archive without syncing", continue without sync.
-   If user chooses "Cancel", stop immediately and do not archive.
+   **Branch explicitly:**
+
+   - **"Archive now"** (already-synced path): perform **step 6** immediately—do **not** invoke the Task tool or any sync flow; treat as success for pre-archive sync.
+   - **"Sync now (recommended)"** or **"Sync anyway"**: use **Task** tool (`subagent_type`: `"general-purpose"`, prompt: `Use Skill tool to invoke openspec-sync-specs for change '<name>'. Delta spec analysis: <include the analyzed delta spec summary>`), then continue toward **step 6** when sync completes.
+   - **"Archive without syncing"**: continue to **step 6** without sync.
+   - **"Cancel"**: stop immediately; do not archive.
 
 6. **Perform the archive**
 
@@ -177,7 +182,7 @@ Target archive directory already exists.
 
 **Guardrails**
 
-- Always prompt for change selection if not provided
+- When no change name is given, prompt via **AskUserQuestion** if inference is ambiguous or multiple active changes exist
 - Validate change names against `openspec list --json` and slug pattern `^[a-z0-9][a-z0-9-]*$` before using in paths
 - Reject path traversal/path injection inputs (`..`, `/`, `\`, etc.)
 - Use artifact graph (openspec status --json) for completion checking

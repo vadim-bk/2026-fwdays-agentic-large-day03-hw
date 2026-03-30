@@ -5228,6 +5228,18 @@ class App extends React.Component<AppProps, AppState> {
                 }
               }
             }
+          } else if (isCodeElement(selectedElement)) {
+            this.startCodeSnippetEditing({ element: selectedElement });
+            resetCursor(this.interactiveCanvas);
+            if (!this.state.activeTool.locked) {
+              this.setState({
+                activeTool: updateActiveTool(this.state, {
+                  type: this.state.preferredSelectionTool.type,
+                }),
+              });
+            }
+            event.preventDefault();
+            return;
           } else if (
             isTextElement(selectedElement) ||
             isValidTextContainer(selectedElement)

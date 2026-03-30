@@ -80,7 +80,7 @@ Implement tasks from an OpenSpec change.
    - Show which task is being worked on
    - Make the code changes required
    - Keep changes minimal and focused
-   - Mark task complete in the tasks file: `- [ ]` → `- [x]`
+   - Mark the current task complete in the tasks artifact using a **schema-aware** update (do not assume Markdown checkboxes). Before editing, run a small helper (e.g. `determineTaskSchema` / `mapCompletionMarker`): inspect the file contents, extension, or a schema header and derive the correct search/replace tokens (e.g. Markdown `- [ ]` → `- [x]`, JSON status fields, or other markers per schema). Apply the replacement for only the completed task line/entry, then continue.
    - Continue to next task
 
    **Pause if:**
@@ -157,7 +157,7 @@ What would you like to do?
 - If task is ambiguous, pause and ask before implementing
 - If implementation reveals issues, pause and suggest artifact updates
 - Keep code changes minimal and scoped to each task
-- Update task checkbox immediately after completing each task
+- Update the task artifact immediately after completing each task, using the mapped completion marker for that file’s schema (not a hardcoded `- [ ]` → `- [x]` unless the file is Markdown checkboxes)
 - Pause on errors, blockers, or unclear requirements - don't guess
 - Use contextFiles from CLI output, don't assume specific file names
 
