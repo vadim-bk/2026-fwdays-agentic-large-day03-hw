@@ -1,3 +1,5 @@
+# Code snippets capability specification
+
 ## ADDED Requirements
 
 ### Requirement: Code snippet element exists on the canvas

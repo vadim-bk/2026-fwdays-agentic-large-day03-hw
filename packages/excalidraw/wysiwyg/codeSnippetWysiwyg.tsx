@@ -41,7 +41,7 @@ export const codeSnippetWysiwyg = ({
   canvas: HTMLCanvasElement;
   getViewportCoords: (x: number, y: number) => [number, number];
   excalidrawContainer: HTMLDivElement | null;
-  onSubmit: (data: { viaKeyboard: boolean }) => void;
+  onSubmit: (data: { viaKeyboard: boolean; nextOriginalText: string }) => void;
 }): (() => void) => {
   let element = app.scene.getElement(id) as ExcalidrawCodeElement | null;
   if (!element || element.type !== "code") {
@@ -151,8 +151,9 @@ export const codeSnippetWysiwyg = ({
       return;
     }
     destroyed = true;
+    const nextOriginalText = textarea.value;
     cleanup();
-    onSubmit({ viaKeyboard: submittedViaKeyboard });
+    onSubmit({ viaKeyboard: submittedViaKeyboard, nextOriginalText });
   };
 
   const cleanup = () => {

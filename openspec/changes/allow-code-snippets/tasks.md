@@ -1,3 +1,5 @@
+# Tasks: code snippets change
+
 ## 1. Data model and types
 
 - [ ] 1.1 Add `ExcalidrawCodeSnippetElement` (or agreed type name) to `packages/element` types with `text`/`code`, `language`, and layout fields aligned with design

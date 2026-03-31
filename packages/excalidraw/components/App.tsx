@@ -134,6 +134,7 @@ import {
   newLinearElement,
   newTextElement,
   newCodeElement,
+  refreshCodeSnippetDimensions,
   refreshTextDimensions,
   deepCopyElement,
   duplicateElements,
@@ -5846,7 +5847,41 @@ class App extends React.Component<AppProps, AppState> {
     updateElement(element.originalText, false);
   }
 
-  private handleCodeSnippetWysiwyg(element: ExcalidrawCodeElement) {
+  private handleCodeSnippetWysiwyg(
+    element: ExcalidrawCodeElement,
+    {
+      isExistingElement = false,
+    }: {
+      isExistingElement?: boolean;
+    },
+  ) {
+    const elementsMap = this.scene.getElementsMapIncludingDeleted();
+
+    const updateCodeSnippetElement = (
+      nextOriginalText: string,
+      isDeleted: boolean,
+    ) => {
+      this.scene.replaceAllElements([
+        ...this.scene.getElementsIncludingDeleted().map((_element) => {
+          if (_element.id === element.id && isCodeElement(_element)) {
+            const dims = refreshCodeSnippetDimensions(
+              _element,
+              elementsMap,
+              nextOriginalText,
+            );
+            if (!dims) {
+              return _element;
+            }
+            return newElementWith(_element, {
+              isDeleted: isDeleted ?? _element.isDeleted,
+              ...dims,
+            });
+          }
+          return _element;
+        }),
+      ]);
+    };
+
     codeSnippetWysiwyg({
       id: element.id,
       canvas: this.canvas,
@@ -5863,7 +5898,10 @@ class App extends React.Component<AppProps, AppState> {
           viewportY - this.state.offsetTop,
         ];
       },
-      onSubmit: withBatchedUpdates(({ viaKeyboard }) => {
+      onSubmit: withBatchedUpdates(({ viaKeyboard, nextOriginalText }) => {
+        const isDeleted = !nextOriginalText.trim();
+        updateCodeSnippetElement(nextOriginalText, isDeleted);
+
         const current = this.scene.getElement(
           element.id,
         ) as ExcalidrawCodeElement | null;
@@ -5885,7 +5923,9 @@ class App extends React.Component<AppProps, AppState> {
           });
         }
 
-        this.store.scheduleCapture();
+        if (!isDeleted || isExistingElement) {
+          this.store.scheduleCapture();
+        }
 
         flushSync(() => {
           this.setState({
@@ -5908,15 +5948,20 @@ class App extends React.Component<AppProps, AppState> {
 
   private startCodeSnippetEditing({
     element,
+    isExistingElement,
   }: {
     element: ExcalidrawCodeElement;
+    isExistingElement: boolean;
   }) {
     this.setState({ editingCodeElement: element });
-    this.handleCodeSnippetWysiwyg(element);
+    this.handleCodeSnippetWysiwyg(element, { isExistingElement });
   }
 
-  private enterCodeSnippetEditing(element: ExcalidrawCodeElement) {
-    this.startCodeSnippetEditing({ element });
+  private enterCodeSnippetEditing(
+    element: ExcalidrawCodeElement,
+    isExistingElement = true,
+  ) {
+    this.startCodeSnippetEditing({ element, isExistingElement });
     resetCursor(this.interactiveCanvas);
     if (!this.state.activeTool.locked) {
       this.setState({
@@ -5972,7 +6017,7 @@ class App extends React.Component<AppProps, AppState> {
     });
 
     this.scene.insertElement(newElement);
-    this.enterCodeSnippetEditing(newElement);
+    this.enterCodeSnippetEditing(newElement, false);
   };
 
   private deselectElements() {
@@ -6697,7 +6742,10 @@ class App extends React.Component<AppProps, AppState> {
       }
 
       if (hitElement && isCodeElement(hitElement)) {
-        this.startCodeSnippetEditing({ element: hitElement });
+        this.startCodeSnippetEditing({
+          element: hitElement,
+          isExistingElement: true,
+        });
         return;
       }
 
@@ -11477,7 +11525,10 @@ class App extends React.Component<AppProps, AppState> {
         this.state.selectedElementIds[hitElement.id] &&
         this.scene.getSelectedElements(this.state).length === 1
       ) {
-        this.startCodeSnippetEditing({ element: hitElement });
+        this.startCodeSnippetEditing({
+          element: hitElement,
+          isExistingElement: true,
+        });
         return;
       }
 
@@ -12786,6 +12837,9 @@ class App extends React.Component<AppProps, AppState> {
         event.target instanceof HTMLTextAreaElement &&
         this.state.editingCodeElement
       ) {
+        if (event[KEYS.CTRL_OR_CMD]) {
+          event.preventDefault();
+        }
         return;
       }
 
